@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator Arkuszy A4 - Karty Muzyczne</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <style>
+        /* --- STYLE INTERFEJSU UŻYTKOWNIKA --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e24;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { margin-bottom: 5px; font-weight: 400; }
+        .subtitle { color: #aaa; margin-bottom: 25px; font-size: 14px; }
+
+        .dashboard {
+            background-color: #2a2a35;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
+            width: 100%;
+            max-width: 650px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .row { display: flex; gap: 15px; align-items: center; }
+        .flex-grow { flex-grow: 1; display: flex; flex-direction: column; gap: 5px; }
+
+        .dashboard input[type="text"] {
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            background-color: #15151d;
+            color: #fff;
+            font-size: 16px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .dashboard input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 50px;
+            height: 45px;
+            border-radius: 6px;
+            cursor: pointer;
+            background: none;
+        }
+        .dashboard input[type="color"]::-webkit-color-swatch { border-radius: 6px; border: 2px solid #fff; }
+
+        .btn-group { display: flex; gap: 10px; width: 100%; }
+        .dashboard button {
+            flex: 1;
+            padding: 14px;
+            border-radius: 6px;
+            border: none;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #add-btn { background-color: #00b0ff; color: #fff; }
+        #add-btn:hover { background-color: #0091ea; }
+        #download-sheets-btn { background-color: #00e676; color: #000; }
+        #download-sheets-btn:hover { background-color: #00c853; }
+
+        .queue-section {
+            width: 100%;
+            max-width: 650px;
+            background: #23232c;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .queue-section h3 { margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 8px; }
+        .queue-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
+        .queue-item {
+            background: #2a2a35;
+            padding: 10px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+        .remove-btn { background: #ff1744; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+
+        .preview-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        /* --- BUDOWA PARY KARTY --- */
+        .card-pair-print {
+            display: flex;
+            width: 130mm;
+            height: 65mm;
+            border: 1px solid #000000;
+            box-sizing: border-box;
+            background: #fff;
+            overflow: hidden;
+        }
+
+        .card-print {
+            width: 65mm;
+            height: 65mm;
+            position: relative;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        /* AWERS DRUK */
+        .print-front {
+            padding: 5mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            text-align: center;
+            color: #000 !important;
+            background-color: #56c68c;
+            background: linear-gradient(135deg, #56c68c 0%, rgba(0, 0, 0, 0.18) 100%);
+        }
+
+        .flag-pl {
+            position: absolute;
+            top: 4mm;
+            left: 4mm;
+            width: 5.2mm;
+            height: 3.2mm;
+            border: 0.2mm solid rgba(0,0,0,0.2);
+            box-sizing: border-box;
+            z-index: 10;
+        }
+        .flag-top { height: 50%; background: #ffffff; }
+        .flag-bottom { height: 50%; background: #dc143c; }
+
+        .editable-text {
+            width: 100%;
+            outline: none;
+            font-family: Arial, sans-serif;
+            z-index: 20;
+            word-wrap: break-word;
+            color: #000000;
+        }
+        .preview-section .editable-text { border: 1px dashed transparent; }
+        .preview-section .editable-text:hover, .preview-section .editable-text:focus {
+            border: 1px dashed rgba(0,0,0,0.4);
+            background-color: rgba(255,255,255,0.4);
+        }
+
+        .artist { font-size: 13pt; font-weight: bold; margin-top: 3mm; line-height: 1.2; }
+        .year { font-weight: 900; letter-spacing: -0.5mm; }
+        .title { font-size: 10pt; font-style: italic; font-weight: 500; margin-bottom: 2mm; line-height: 1.3; }
+
+        /* REWERS DRUK + LINIA ZGIĘCIA */
+        .print-back {
+            border-left: 1px dashed #777777;
+            background-color: #0d0d11;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .vinyl-pattern {
+            position: absolute;
+            width: 55mm;
+            height: 55mm;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .circle { position: absolute; border-radius: 50%; border: 0.8mm solid transparent; box-sizing: border-box; }
+        .c1 { width: 55mm; height: 55mm; border-color: #ff007f; border-style: double; transform: rotate(15deg); }
+        .c2 { width: 50mm; height: 50mm; border-color: #00e5ff; border-dasharray: 25mm 4mm; transform: rotate(-45deg); }
+        .c3 { width: 45mm; height: 45mm; border-color: #ffea00; border-style: dashed; transform: rotate(70deg); }
+        .c4 { width: 40mm; height: 40mm; border-color: #9c27b0; border-width: 0.6mm; border-dasharray: 12mm 6mm; }
+        .c5 { width: 35mm; height: 35mm; border-color: #ff007f; transform: rotate(115deg); }
+        .c6 { width: 30mm; height: 30mm; border-color: #ffea00; border-dasharray: 30mm 2mm; }
+
+        .qr-wrapper {
+            position: relative;
+            z-index: 10;
+            background: white;
+            padding: 2mm;
+            border-radius: 1mm;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .qr-wrapper canvas, .qr-wrapper img { width: 22mm !important; height: 22mm !important; }
+
+        /* --- ARKUSZ A4 - IDEALNE WYŚRODKOWANIE PION / POZIOM --- */
+        .a4-sheet {
+            width: 210mm;
+            height: 297mm;
+            background-color: #ffffff;
+            position: absolute;
+            left: -9999mm;
+            top: -9999mm;
+            box-sizing: border-box;
+            
+            /* Wycentrowanie całej siatki elementów na stronie */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            align-content: center;
+            
+            gap: 15mm; /* Odstęp pionowy pomiędzy parami kart */
+        }
+        
+        .a4-sheet * {
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Generator Arkuszy A4 - Karty Muzyczne</h1>
+    <div class="subtitle">Wymiar rzeczywisty karty po wycięciu i złożeniu: 6.5 cm x 6.5 cm</div>
+
+    <div class="dashboard">
+        <div class="row">
+            <div class="flex-grow">
+                <label for="url-input">Wklej link (Spotify / YouTube) dla kodu QR:</label>
+                <input type="text" id="url-input" placeholder="Wklej adres url..." value="">
+            </div>
+            <div>
+                <label for="color-input" style="display:block; margin-bottom:5px;">Kolor:</label>
+                <input type="color" id="color-input" value="#56c68c">
+            </div>
+        </div>
+        <div class="btn-group">
+            <button id="add-btn">➕ Dodaj kartę do listy</button>
+            <button id="download-sheets-btn">💾 Pobierz arkusze A4 (JPG)</button>
+        </div>
+    </div>
+
+    <div class="queue-section">
+        <h3>Lista kart w kolejce do druku (<span id="queue-count">0</span>)</h3>
+        <div class="queue-list" id="queue-container"></div>
+    </div>
+
+    <div class="preview-section">
+        <span>👇 Edytuj dane bezpośrednio na karcie poniżej przed dodaniem jej do listy:</span>
+        <div class="cards-container">
+            <div class="card-pair-print" id="live-preview-pair">
+                <div class="card-print print-front" id="awers-card">
+                    <div class="flag-pl"><div class="flag-top"></div><div class="flag-bottom"></div></div>
+                    <div class="editable-text artist" id="txt-artist" contenteditable="true">&lt;Nazwa wykonawcy&gt;</div>
+                    <div class="editable-text year" id="txt-year" contenteditable="true" style="font-size: 18pt;">&lt;Rok wydania&gt;</div>
+                    <div class="editable-text title" id="txt-title" contenteditable="true">&lt;Tytuł utworu&gt;</div>
+                </div>
+
+                <div class="card-print print-back">
+                    <div class="vinyl-pattern">
+                        <div class="circle c1"></div><div class="circle c2"></div><div class="circle c3"></div>
+                        <div class="circle c4"></div><div class="circle c5"></div><div class="circle c6"></div>
+                    </div>
+                    <div class="qr-wrapper">
+                        <div id="qrcode"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="sheet-generator-factory"></div>
+
+    <script>
+        const qrContainer = document.getElementById("qrcode");
+        const urlInput = document.getElementById("url-input");
+        const colorInput = document.getElementById("color-input");
+        const awersCard = document.getElementById("awers-card");
+        
+        const artistInput = document.getElementById("txt-artist");
+        const yearInput = document.getElementById("txt-year");
+        const titleInput = document.getElementById("txt-title");
+        
+        const queueContainer = document.getElementById("queue-container");
+        const queueCountElement = document.getElementById("queue-count");
+        const factory = document.getElementById("sheet-generator-factory");
+
+        let savedCardsCollection = [];
+
+        const qrcode = new QRCode(qrContainer, {
+            text: "https://open.spotify.com",
+            width: 150,
+            height: 150,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+
+        urlInput.addEventListener("input", function() {
+            qrcode.clear();
+            let targetUrl = urlInput.value.trim();
+            if(targetUrl === "") targetUrl = "https://open.spotify.com";
+            qrcode.makeCode(targetUrl);
+        });
+
+        yearInput.addEventListener("input", function() {
+            const txt = yearInput.innerText.trim();
+            yearInput.style.fontSize = /^\d+$/.test(txt) ? "36pt" : "18pt";
+        });
+
+        colorInput.addEventListener("input", function() {
+            const baseColor = colorInput.value;
+            awersCard.style.backgroundColor = baseColor;
+            awersCard.style.background = `linear-gradient(135deg, ${baseColor} 0%, rgba(0,0,0,0.18) 100%)`;
+        });
+
+        function resetCardToPlaceholders() {
+            artistInput.innerHTML = "&lt;Nazwa wykonawcy&gt;";
+            yearInput.innerHTML = "&lt;Rok wydania&gt;";
+            yearInput.style.fontSize = "18pt";
+            titleInput.innerHTML = "&lt;Tytuł utworu&gt;";
+            urlInput.value = "";
+            qrcode.makeCode("https://open.spotify.com");
+        }
+
+        document.getElementById("add-btn").addEventListener("click", function() {
+            const artist = artistInput.innerText.trim();
+            const year = yearInput.innerText.trim();
+            const title = titleInput.innerText.trim();
+            const currentQrSource = qrContainer.querySelector("canvas").toDataURL("image/png");
+            const currentBg = awersCard.style.background;
+            const currentBgColor = awersCard.style.backgroundColor;
+
+            const cardData = {
+                id: Date.now(),
+                artist: artist,
+                year: year,
+                title: title,
+                qrDataUrl: currentQrSource,
+                backgroundStyle: currentBg,
+                backgroundColor: currentBgColor,
+                yearFontSize: yearInput.style.fontSize
+            };
+
+            savedCardsCollection.push(cardData);
+            updateQueueUI();
+            resetCardToPlaceholders();
+        });
+
+        function updateQueueUI() {
+            queueContainer.innerHTML = "";
+            queueCountElement.innerText = savedCardsCollection.length;
+
+            savedCardsCollection.forEach((card, index) => {
+                const item = document.createElement("div");
+                item.className = "queue-item";
+                item.innerHTML = `
+                    <span><strong>#${index + 1}</strong> ${card.artist} - ${card.title} (${card.year})</span>
+                    <button class="remove-btn" onclick="removeCardFromQueue(${card.id})">Usuń</button>
+                `;
+                queueContainer.appendChild(item);
+            });
+        }
+
+        window.removeCardFromQueue = function(id) {
+            savedCardsCollection = savedCardsCollection.filter(c => c.id !== id);
+            updateQueueUI();
+        };
+
+        document.getElementById("download-sheets-btn").addEventListener("click", function() {
+            if(savedCardsCollection.length === 0) {
+                alert("Najpierw dodaj przynajmniej jedną kartę do listy klikając niebieski przycisk!");
+                return;
+            }
+
+            const mainBtn = this;
+            mainBtn.innerText = "Trwa przetwarzanie arkuszy A4...";
+            mainBtn.disabled = true;
+            factory.innerHTML = "";
+
+            const CARDS_PER_A4 = 3; 
+            const totalSheetsNeeded = Math.ceil(savedCardsCollection.length / CARDS_PER_A4);
+
+            for (let s = 0; s < totalSheetsNeeded; s++) {
+                const sheetA4 = document.createElement("div");
+                sheetA4.className = "a4-sheet";
+                sheetA4.id = `sheet-idx-${s}`;
+
+                const startIdx = s * CARDS_PER_A4;
+                const endIdx = Math.min(startIdx + CARDS_PER_A4, savedCardsCollection.length);
+
+                for (let i = startIdx; i < endIdx; i++) {
+                    const data = savedCardsCollection[i];
+                    const pair = document.createElement("div");
+                    pair.className = "card-pair-print";
+                    
+                    pair.innerHTML = `
+                        <div class="card-print print-front" style="background: ${data.backgroundStyle}; background-color: ${data.backgroundColor};">
+                            <div class="flag-pl"><div class="flag-top"></div><div class="flag-bottom"></div></div>
+                            <div class="editable-text artist">${data.artist}</div>
+                            <div class="editable-text year" style="font-size: ${data.yearFontSize};">${data.year}</div>
+                            <div class="editable-text title">${data.title}</div>
+                        </div>
+                        <div class="card-print print-back">
+                            <div class="vinyl-pattern">
+                                <div class="circle c1"></div><div class="circle c2"></div><div class="circle c3"></div>
+                                <div class="circle c4"></div><div class="circle c5"></div><div class="circle c6"></div>
+                            </div>
+                            <div class="qr-wrapper">
+                                <img src="${data.qrDataUrl}" style="width:22mm; height:22mm;">
+                            </div>
+                        </div>
+                    `;
+                    sheetA4.appendChild(pair);
+                }
+                factory.appendChild(sheetA4);
+            }
+
+            let currentProcessSheet = 0;
+
+            function processAndDownloadNextSheet() {
+                if (currentProcessSheet >= totalSheetsNeeded) {
+                    mainBtn.innerText = "💾 Pobierz arkusze A4 (JPG)";
+                    mainBtn.disabled = false;
+                    factory.innerHTML = "";
+                    return;
+                }
+
+                const targetSheetDOM = document.getElementById(`sheet-idx-${currentProcessSheet}`);
+                
+                html2canvas(targetSheetDOM, {
+                    scale: 3,
+                    useCORS: true,
+                    backgroundColor: "#ffffff"
+                }).then(canvas => {
+                    let link = document.createElement('a');
+                    link.download = `Arkusz_A4_Strona_${currentProcessSheet + 1}.jpg`;
+                    link.href = canvas.toDataURL('image/jpeg', 0.95);
+                    link.click();
+
+                    currentProcessSheet++;
+                    setTimeout(processAndDownloadNextSheet, 600);
+                });
+            }
+
+            setTimeout(processAndDownloadNextSheet, 300);
+        });
+    </script>
+</body>
+</html>
