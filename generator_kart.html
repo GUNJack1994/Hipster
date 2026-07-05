@@ -61,7 +61,9 @@
         }
         .dashboard input[type="color"]::-webkit-color-swatch { border-radius: 6px; border: 2px solid #fff; }
 
-        .btn-group { display: flex; gap: 10px; width: 100%; }
+        .btn-group { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+        .btn-row { display: flex; gap: 10px; width: 100%; }
+        
         .dashboard button {
             flex: 1;
             padding: 14px;
@@ -74,6 +76,12 @@
         }
         #add-btn { background-color: #00b0ff; color: #fff; }
         #add-btn:hover { background-color: #0091ea; }
+        #add-btn.edit-mode { background-color: #4caf50; color: #fff; }
+        #add-btn.edit-mode:hover { background-color: #43a047; }
+        
+        #cancel-edit-btn { background-color: #757575; color: #fff; display: none; }
+        #cancel-edit-btn:hover { background-color: #616161; }
+
         #download-sheets-btn { background-color: #00e676; color: #000; }
         #download-sheets-btn:hover { background-color: #00c853; }
 
@@ -86,7 +94,7 @@
             margin-bottom: 20px;
         }
         .queue-section h3 { margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 8px; }
-        .queue-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
+        .queue-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; }
         .queue-item {
             background: #2a2a35;
             padding: 10px;
@@ -96,7 +104,11 @@
             align-items: center;
             font-size: 14px;
         }
+        .item-actions { display: flex; gap: 6px; }
+        .edit-item-btn { background: #ffb300; color: #000; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .edit-item-btn:hover { background: #ffa000; }
         .remove-btn { background: #ff1744; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .remove-btn:hover { background: #d50000; }
 
         .preview-section {
             display: flex;
@@ -208,7 +220,7 @@
         }
         .qr-wrapper canvas, .qr-wrapper img { width: 22mm !important; height: 22mm !important; }
 
-        /* --- ARKUSZ A4 - IDEALNE WYŚRODKOWANIE PION / POZIOM --- */
+        /* --- ARKUSZ A4 --- */
         .a4-sheet {
             width: 210mm;
             height: 297mm;
@@ -218,14 +230,13 @@
             top: -9999mm;
             box-sizing: border-box;
             
-            /* Wycentrowanie całej siatki elementów na stronie */
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             align-content: center;
             
-            gap: 15mm; /* Odstęp pionowy pomiędzy parami kart */
+            gap: 15mm;
         }
         
         .a4-sheet * {
@@ -236,12 +247,11 @@
 <body>
 
     <h1>Generator Arkuszy A4 - Karty Muzyczne</h1>
-    <div class="subtitle">Wymiar rzeczywisty karty po wycięciu i złożeniu: 6.5 cm x 6.5 cm</div>
 
     <div class="dashboard">
         <div class="row">
             <div class="flex-grow">
-                <label for="url-input">Wklej link (Spotify / YouTube) dla kodu QR:</label>
+                <label for="url-input">Wklej link (YouTube) dla kodu QR:</label>
                 <input type="text" id="url-input" placeholder="Wklej adres url..." value="">
             </div>
             <div>
@@ -250,7 +260,10 @@
             </div>
         </div>
         <div class="btn-group">
-            <button id="add-btn">➕ Dodaj kartę do listy</button>
+            <div class="btn-row">
+                <button id="add-btn">➕ Dodaj kartę do listy</button>
+                <button id="cancel-edit-btn">Anuluj edycję</button>
+            </div>
             <button id="download-sheets-btn">💾 Pobierz arkusze A4 (JPG)</button>
         </div>
     </div>
@@ -299,8 +312,12 @@
         const queueContainer = document.getElementById("queue-container");
         const queueCountElement = document.getElementById("queue-count");
         const factory = document.getElementById("sheet-generator-factory");
+        
+        const addBtn = document.getElementById("add-btn");
+        const cancelEditBtn = document.getElementById("cancel-edit-btn");
 
         let savedCardsCollection = [];
+        let currentlyEditedCardId = null; // Przechowuje ID karty, którą aktualnie edytujemy
 
         const qrcode = new QRCode(qrContainer, {
             text: "https://open.spotify.com",
@@ -323,10 +340,13 @@
             yearInput.style.fontSize = /^\d+$/.test(txt) ? "36pt" : "18pt";
         });
 
+        function updateCardBackground(hexColor) {
+            awersCard.style.backgroundColor = hexColor;
+            awersCard.style.background = `linear-gradient(135deg, ${hexColor} 0%, rgba(0,0,0,0.18) 100%)`;
+        }
+
         colorInput.addEventListener("input", function() {
-            const baseColor = colorInput.value;
-            awersCard.style.backgroundColor = baseColor;
-            awersCard.style.background = `linear-gradient(135deg, ${baseColor} 0%, rgba(0,0,0,0.18) 100%)`;
+            updateCardBackground(colorInput.value);
         });
 
         function resetCardToPlaceholders() {
@@ -335,30 +355,63 @@
             yearInput.style.fontSize = "18pt";
             titleInput.innerHTML = "&lt;Tytuł utworu&gt;";
             urlInput.value = "";
+            colorInput.value = "#56c68c";
+            updateCardBackground("#56c68c");
             qrcode.makeCode("https://open.spotify.com");
+            
+            // Wyjście z trybu edycji
+            currentlyEditedCardId = null;
+            addBtn.innerText = "➕ Dodaj kartę do listy";
+            addBtn.classList.remove("edit-mode");
+            cancelEditBtn.style.display = "none";
         }
 
-        document.getElementById("add-btn").addEventListener("click", function() {
+        addBtn.addEventListener("click", function() {
             const artist = artistInput.innerText.trim();
             const year = yearInput.innerText.trim();
             const title = titleInput.innerText.trim();
             const currentQrSource = qrContainer.querySelector("canvas").toDataURL("image/png");
             const currentBg = awersCard.style.background;
             const currentBgColor = awersCard.style.backgroundColor;
+            const currentHex = colorInput.value;
+            const currentRawUrl = urlInput.value.trim();
 
-            const cardData = {
-                id: Date.now(),
-                artist: artist,
-                year: year,
-                title: title,
-                qrDataUrl: currentQrSource,
-                backgroundStyle: currentBg,
-                backgroundColor: currentBgColor,
-                yearFontSize: yearInput.style.fontSize
-            };
+            if (currentlyEditedCardId !== null) {
+                // TRYB EDYCJI: Znajdź istniejącą kartę i zaktualizuj jej właściwości
+                const cardIndex = savedCardsCollection.findIndex(c => c.id === currentlyEditedCardId);
+                if (cardIndex !== -1) {
+                    savedCardsCollection[cardIndex].artist = artist;
+                    savedCardsCollection[cardIndex].year = year;
+                    savedCardsCollection[cardIndex].title = title;
+                    savedCardsCollection[cardIndex].qrDataUrl = currentQrSource;
+                    savedCardsCollection[cardIndex].backgroundStyle = currentBg;
+                    savedCardsCollection[cardIndex].backgroundColor = currentBgColor;
+                    savedCardsCollection[cardIndex].hexColor = currentHex;
+                    savedCardsCollection[cardIndex].rawUrl = currentRawUrl;
+                    savedCardsCollection[cardIndex].yearFontSize = yearInput.style.fontSize;
+                }
+            } else {
+                // TRYB DODAWANIA: Stwórz zupełnie nową kartę
+                const cardData = {
+                    id: Date.now(),
+                    artist: artist,
+                    year: year,
+                    title: title,
+                    qrDataUrl: currentQrSource,
+                    backgroundStyle: currentBg,
+                    backgroundColor: currentBgColor,
+                    hexColor: currentHex,
+                    rawUrl: currentRawUrl,
+                    yearFontSize: yearInput.style.fontSize
+                };
+                savedCardsCollection.push(cardData);
+            }
 
-            savedCardsCollection.push(cardData);
             updateQueueUI();
+            resetCardToPlaceholders();
+        });
+
+        cancelEditBtn.addEventListener("click", function() {
             resetCardToPlaceholders();
         });
 
@@ -371,13 +424,49 @@
                 item.className = "queue-item";
                 item.innerHTML = `
                     <span><strong>#${index + 1}</strong> ${card.artist} - ${card.title} (${card.year})</span>
-                    <button class="remove-btn" onclick="removeCardFromQueue(${card.id})">Usuń</button>
+                    <div class="item-actions">
+                        <button class="edit-item-btn" onclick="startEditingCard(${card.id})">✏️ Edytuj</button>
+                        <button class="remove-btn" onclick="removeCardFromQueue(${card.id})">Usuń</button>
+                    </div>
                 `;
                 queueContainer.appendChild(item);
             });
         }
 
+        window.startEditingCard = function(id) {
+            const cardToEdit = savedCardsCollection.find(c => c.id === id);
+            if (!cardToEdit) return;
+
+            currentlyEditedCardId = id;
+
+            // Wypełnij formularz główny danymi wybranej karty
+            artistInput.innerText = cardToEdit.artist;
+            yearInput.innerText = cardToEdit.year;
+            yearInput.style.fontSize = cardToEdit.yearFontSize;
+            titleInput.innerText = cardToEdit.title;
+            urlInput.value = cardToEdit.rawUrl;
+            colorInput.value = cardToEdit.hexColor;
+            
+            updateCardBackground(cardToEdit.hexColor);
+            
+            qrcode.clear();
+            let targetUrl = cardToEdit.rawUrl || "https://open.spotify.com";
+            qrcode.makeCode(targetUrl);
+
+            // Przełącz przyciski w tryb edycji
+            addBtn.innerText = "💾 Zapisz zmiany w karcie";
+            addBtn.classList.add("edit-mode");
+            cancelEditBtn.style.display = "block";
+            
+            // Przewiń widok do góry do formularza edycji
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
         window.removeCardFromQueue = function(id) {
+            // Jeśli usuwamy kartę, która była w trakcie edycji, zresetuj formularz
+            if (currentlyEditedCardId === id) {
+                resetCardToPlaceholders();
+            }
             savedCardsCollection = savedCardsCollection.filter(c => c.id !== id);
             updateQueueUI();
         };
