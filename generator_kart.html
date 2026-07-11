@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="pl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generator Arkuszy A4 - Karty Muzyczne</title>
+    <title>Generator Arkuszy A4 - YouTube QR</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
     <style>
         /* --- STYLE INTERFEJSU UŻYTKOWNIKA --- */
         body {
@@ -20,14 +23,16 @@
             align-items: center;
         }
 
-        h1 { margin-bottom: 5px; font-weight: 400; }
-        .subtitle { color: #aaa; margin-bottom: 25px; font-size: 14px; }
+        h1 {
+            margin-bottom: 25px;
+            font-weight: 400;
+        }
 
         .dashboard {
             background-color: #2a2a35;
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
             margin-bottom: 30px;
             width: 100%;
             max-width: 650px;
@@ -36,8 +41,18 @@
             gap: 15px;
         }
 
-        .row { display: flex; gap: 15px; align-items: center; }
-        .flex-grow { flex-grow: 1; display: flex; flex-direction: column; gap: 5px; }
+        .row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .flex-grow {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
 
         .dashboard input[type="text"] {
             padding: 12px;
@@ -48,6 +63,12 @@
             font-size: 16px;
             width: 100%;
             box-sizing: border-box;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .dashboard input[type="text"].input-error {
+            border-color: #ff1744 !important;
+            box-shadow: 0 0 8px rgba(255, 23, 68, 0.4);
         }
 
         .dashboard input[type="color"] {
@@ -59,11 +80,25 @@
             cursor: pointer;
             background: none;
         }
-        .dashboard input[type="color"]::-webkit-color-swatch { border-radius: 6px; border: 2px solid #fff; }
 
-        .btn-group { display: flex; flex-direction: column; gap: 10px; width: 100%; }
-        .btn-row { display: flex; gap: 10px; width: 100%; }
-        
+        .dashboard input[type="color"]::-webkit-color-swatch {
+            border-radius: 6px;
+            border: 2px solid #fff;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
         .dashboard button {
             flex: 1;
             padding: 14px;
@@ -72,18 +107,67 @@
             font-size: 15px;
             font-weight: bold;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background 0.2s, color 0.2s;
         }
-        #add-btn { background-color: #00b0ff; color: #fff; }
-        #add-btn:hover { background-color: #0091ea; }
-        #add-btn.edit-mode { background-color: #4caf50; color: #fff; }
-        #add-btn.edit-mode:hover { background-color: #43a047; }
-        
-        #cancel-edit-btn { background-color: #757575; color: #fff; display: none; }
-        #cancel-edit-btn:hover { background-color: #616161; }
 
-        #download-sheets-btn { background-color: #00e676; color: #000; }
-        #download-sheets-btn:hover { background-color: #00c853; }
+        #add-btn {
+            background-color: #00b0ff;
+            color: #fff;
+        }
+
+        #add-btn:hover {
+            background-color: #0091ea;
+        }
+
+        #add-btn.edit-mode {
+            background-color: #4caf50;
+            color: #fff;
+        }
+
+        #add-btn.edit-mode:hover {
+            background-color: #43a047;
+        }
+
+        #cancel-edit-btn {
+            background-color: #757575;
+            color: #fff;
+            display: none;
+        }
+
+        #cancel-edit-btn:hover {
+            background-color: #616161;
+        }
+
+        #download-sheets-btn {
+            background-color: #00e676;
+            color: #000;
+        }
+
+        #download-sheets-btn:hover {
+            background-color: #00c853;
+        }
+
+        .csv-actions-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        .btn-csv {
+            background-color: #3f51b5;
+            color: #fff;
+            font-size: 13px !important;
+            padding: 10px !important;
+        }
+
+        .btn-csv:hover {
+            background-color: #303f9f;
+        }
+
+        #csv-file-input {
+            display: none;
+        }
 
         .queue-section {
             width: 100%;
@@ -93,8 +177,44 @@
             border-radius: 8px;
             margin-bottom: 20px;
         }
-        .queue-section h3 { margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 8px; }
-        .queue-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; }
+
+        .queue-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+        }
+
+        .queue-header-row h3 {
+            margin: 0;
+        }
+
+        #test-qr-btn {
+            background-color: #29b6f6;
+            color: #000;
+            font-size: 12px;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #test-qr-btn:hover {
+            background-color: #039be5;
+            color: #fff;
+        }
+
+        .queue-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
         .queue-item {
             background: #2a2a35;
             padding: 10px;
@@ -104,11 +224,71 @@
             align-items: center;
             font-size: 14px;
         }
-        .item-actions { display: flex; gap: 6px; }
-        .edit-item-btn { background: #ffb300; color: #000; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .edit-item-btn:hover { background: #ffa000; }
-        .remove-btn { background: #ff1744; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
-        .remove-btn:hover { background: #d50000; }
+
+        .item-info-block {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .qr-status-badge {
+            font-size: 11px;
+            font-weight: bold;
+            margin-top: 2px;
+        }
+
+        .status-none {
+            color: #888;
+        }
+
+        .status-ok {
+            color: #00e676;
+            background: rgba(0, 230, 118, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+
+        .status-fail {
+            color: #ff1744;
+            background: rgba(255, 23, 68, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .edit-item-btn {
+            background: #ffb300;
+            color: #000;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .edit-item-btn:hover {
+            background: #ffa000;
+        }
+
+        .remove-btn {
+            background: #ff1744;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .remove-btn:hover {
+            background: #d50000;
+        }
 
         .preview-section {
             display: flex;
@@ -156,12 +336,20 @@
             left: 4mm;
             width: 5.2mm;
             height: 3.2mm;
-            border: 0.2mm solid rgba(0,0,0,0.2);
+            border: 0.2mm solid rgba(0, 0, 0, 0.2);
             box-sizing: border-box;
             z-index: 10;
         }
-        .flag-top { height: 50%; background: #ffffff; }
-        .flag-bottom { height: 50%; background: #dc143c; }
+
+        .flag-top {
+            height: 50%;
+            background: #ffffff;
+        }
+
+        .flag-bottom {
+            height: 50%;
+            background: #dc143c;
+        }
 
         .editable-text {
             width: 100%;
@@ -171,17 +359,38 @@
             word-wrap: break-word;
             color: #000000;
         }
-        .preview-section .editable-text { border: 1px dashed transparent; }
-        .preview-section .editable-text:hover, .preview-section .editable-text:focus {
-            border: 1px dashed rgba(0,0,0,0.4);
-            background-color: rgba(255,255,255,0.4);
+
+        .preview-section .editable-text {
+            border: 1px dashed transparent;
         }
 
-        .artist { font-size: 13pt; font-weight: bold; margin-top: 3mm; line-height: 1.2; }
-        .year { font-weight: 900; letter-spacing: -0.5mm; }
-        .title { font-size: 10pt; font-style: italic; font-weight: 500; margin-bottom: 2mm; line-height: 1.3; }
+        .preview-section .editable-text:hover,
+        .preview-section .editable-text:focus {
+            border: 1px dashed rgba(0, 0, 0, 0.4);
+            background-color: rgba(255, 255, 255, 0.4);
+        }
 
-        /* REWERS DRUK + LINIA ZGIĘCIA */
+        .artist {
+            font-size: 13pt;
+            font-weight: bold;
+            margin-top: 3mm;
+            line-height: 1.2;
+        }
+
+        .year {
+            font-weight: 900;
+            letter-spacing: -0.5mm;
+        }
+
+        .title {
+            font-size: 10pt;
+            font-style: italic;
+            font-weight: 500;
+            margin-bottom: 2mm;
+            line-height: 1.3;
+        }
+
+        /* REWERS DRUK */
         .print-back {
             border-left: 1px dashed #777777;
             background-color: #0d0d11;
@@ -200,13 +409,58 @@
             align-items: center;
         }
 
-        .circle { position: absolute; border-radius: 50%; border: 0.8mm solid transparent; box-sizing: border-box; }
-        .c1 { width: 55mm; height: 55mm; border-color: #ff007f; border-style: double; transform: rotate(15deg); }
-        .c2 { width: 50mm; height: 50mm; border-color: #00e5ff; border-dasharray: 25mm 4mm; transform: rotate(-45deg); }
-        .c3 { width: 45mm; height: 45mm; border-color: #ffea00; border-style: dashed; transform: rotate(70deg); }
-        .c4 { width: 40mm; height: 40mm; border-color: #9c27b0; border-width: 0.6mm; border-dasharray: 12mm 6mm; }
-        .c5 { width: 35mm; height: 35mm; border-color: #ff007f; transform: rotate(115deg); }
-        .c6 { width: 30mm; height: 30mm; border-color: #ffea00; border-dasharray: 30mm 2mm; }
+        .circle {
+            position: absolute;
+            border-radius: 50%;
+            border: 0.8mm solid transparent;
+            box-sizing: border-box;
+        }
+
+        .c1 {
+            width: 55mm;
+            height: 55mm;
+            border-color: #ff007f;
+            border-style: double;
+            transform: rotate(15deg);
+        }
+
+        .c2 {
+            width: 50mm;
+            height: 50mm;
+            border-color: #00e5ff;
+            border-dasharray: 25mm 4mm;
+            transform: rotate(-45deg);
+        }
+
+        .c3 {
+            width: 45mm;
+            height: 45mm;
+            border-color: #ffea00;
+            border-style: dashed;
+            transform: rotate(70deg);
+        }
+
+        .c4 {
+            width: 40mm;
+            height: 40mm;
+            border-color: #9c27b0;
+            border-width: 0.6mm;
+            border-dasharray: 12mm 6mm;
+        }
+
+        .c5 {
+            width: 35mm;
+            height: 35mm;
+            border-color: #ff007f;
+            transform: rotate(115deg);
+        }
+
+        .c6 {
+            width: 30mm;
+            height: 30mm;
+            border-color: #ffea00;
+            border-dasharray: 30mm 2mm;
+        }
 
         .qr-wrapper {
             position: relative;
@@ -218,7 +472,12 @@
             justify-content: center;
             align-items: center;
         }
-        .qr-wrapper canvas, .qr-wrapper img { width: 22mm !important; height: 22mm !important; }
+
+        .qr-wrapper canvas,
+        .qr-wrapper img {
+            width: 22mm !important;
+            height: 22mm !important;
+        }
 
         /* --- ARKUSZ A4 --- */
         .a4-sheet {
@@ -229,30 +488,31 @@
             left: -9999mm;
             top: -9999mm;
             box-sizing: border-box;
-            
+
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             align-content: center;
-            
+
             gap: 15mm;
         }
-        
+
         .a4-sheet * {
             box-sizing: border-box;
         }
     </style>
 </head>
+
 <body>
 
-    <h1>Generator Arkuszy A4 - Karty Muzyczne</h1>
+    <h1>Generator Arkuszy A4 - YouTube QR</h1>
 
     <div class="dashboard">
         <div class="row">
             <div class="flex-grow">
-                <label for="url-input">Wklej link (YouTube) dla kodu QR:</label>
-                <input type="text" id="url-input" placeholder="Wklej adres url..." value="">
+                <label for="url-input">Wklej link z YouTube dla kodu QR:</label>
+                <input type="text" id="url-input" placeholder="Wklej adres URL filmu z YouTube..." value="">
             </div>
             <div>
                 <label for="color-input" style="display:block; margin-bottom:5px;">Kolor:</label>
@@ -264,13 +524,37 @@
                 <button id="add-btn">➕ Dodaj kartę do listy</button>
                 <button id="cancel-edit-btn">Anuluj edycję</button>
             </div>
-            <button id="download-sheets-btn">💾 Pobierz arkusze A4 (JPG)</button>
+            <button id="download-sheets-btn">💾 Pobierz arkusze A4 (PDF)</button>
+
+            <div class="csv-actions-row">
+                <button id="export-csv-btn" class="btn-csv">📤 Eksportuj listę do CSV</button>
+                <button id="import-csv-trigger" class="btn-csv">📥 Importuj listę z CSV</button>
+                <input type="file" id="csv-file-input" accept=".csv">
+            </div>
         </div>
     </div>
 
+    <div id="qr-hidden-generator" style="display:none;"></div>
+
     <div class="queue-section">
-        <h3>Lista kart w kolejce do druku (<span id="queue-count">0</span>)</h3>
+        <div class="queue-header-row">
+            <h3>Lista kart w kolejce do druku (<span id="queue-count">0</span>)</h3>
+            <button id="test-qr-btn" title="Automatyczny test odczytu kodów QR oraz dostępności filmów">🔍 Przetestuj
+                poprawność kodów QR</button>
+        </div>
         <div class="queue-list" id="queue-container"></div>
+    </div>
+
+    <div id="report-section"
+        style="display: none; width: 100%; max-width: 650px; background: #2a1f2d; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ff1744;">
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ff1744; padding-bottom: 8px; margin-bottom: 10px;">
+            <h3 style="margin: 0; color: #ff1744;">📋 Raport z walidacji (Znaleziono błędy)</h3>
+            <button id="download-report-btn"
+                style="background-color: #ff1744; color: #fff; font-size: 12px; padding: 6px 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">💾
+                Pobierz plik .TXT</button>
+        </div>
+        <div id="report-table-container"></div>
     </div>
 
     <div class="preview-section">
@@ -278,16 +562,25 @@
         <div class="cards-container">
             <div class="card-pair-print" id="live-preview-pair">
                 <div class="card-print print-front" id="awers-card">
-                    <div class="flag-pl"><div class="flag-top"></div><div class="flag-bottom"></div></div>
-                    <div class="editable-text artist" id="txt-artist" contenteditable="true">&lt;Nazwa wykonawcy&gt;</div>
-                    <div class="editable-text year" id="txt-year" contenteditable="true" style="font-size: 18pt;">&lt;Rok wydania&gt;</div>
+                    <div class="flag-pl">
+                        <div class="flag-top"></div>
+                        <div class="flag-bottom"></div>
+                    </div>
+                    <div class="editable-text artist" id="txt-artist" contenteditable="true">&lt;Nazwa wykonawcy&gt;
+                    </div>
+                    <div class="editable-text year" id="txt-year" contenteditable="true" style="font-size: 18pt;">
+                        &lt;Rok wydania&gt;</div>
                     <div class="editable-text title" id="txt-title" contenteditable="true">&lt;Tytuł utworu&gt;</div>
                 </div>
 
                 <div class="card-print print-back">
                     <div class="vinyl-pattern">
-                        <div class="circle c1"></div><div class="circle c2"></div><div class="circle c3"></div>
-                        <div class="circle c4"></div><div class="circle c5"></div><div class="circle c6"></div>
+                        <div class="circle c1"></div>
+                        <div class="circle c2"></div>
+                        <div class="circle c3"></div>
+                        <div class="circle c4"></div>
+                        <div class="circle c5"></div>
+                        <div class="circle c6"></div>
                     </div>
                     <div class="qr-wrapper">
                         <div id="qrcode"></div>
@@ -304,38 +597,44 @@
         const urlInput = document.getElementById("url-input");
         const colorInput = document.getElementById("color-input");
         const awersCard = document.getElementById("awers-card");
-        
+
         const artistInput = document.getElementById("txt-artist");
         const yearInput = document.getElementById("txt-year");
         const titleInput = document.getElementById("txt-title");
-        
+
         const queueContainer = document.getElementById("queue-container");
         const queueCountElement = document.getElementById("queue-count");
         const factory = document.getElementById("sheet-generator-factory");
-        
+
         const addBtn = document.getElementById("add-btn");
         const cancelEditBtn = document.getElementById("cancel-edit-btn");
+        const testQrBtn = document.getElementById("test-qr-btn");
 
         let savedCardsCollection = [];
-        let currentlyEditedCardId = null; // Przechowuje ID karty, którą aktualnie edytujemy
+        let currentlyEditedCardId = null;
+
+        const defaultYoutubeUrl = "https://www.youtube.com";
 
         const qrcode = new QRCode(qrContainer, {
-            text: "https://open.spotify.com",
+            text: defaultYoutubeUrl,
             width: 150,
             height: 150,
-            colorDark : "#000000",
-            colorLight : "#ffffff",
-            correctLevel : QRCode.CorrectLevel.H
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
         });
 
-        urlInput.addEventListener("input", function() {
+        urlInput.addEventListener("input", function () {
+            if (urlInput.value.trim() !== "") {
+                urlInput.classList.remove("input-error");
+            }
             qrcode.clear();
             let targetUrl = urlInput.value.trim();
-            if(targetUrl === "") targetUrl = "https://open.spotify.com";
+            if (targetUrl === "") targetUrl = defaultYoutubeUrl;
             qrcode.makeCode(targetUrl);
         });
 
-        yearInput.addEventListener("input", function() {
+        yearInput.addEventListener("input", function () {
             const txt = yearInput.innerText.trim();
             yearInput.style.fontSize = /^\d+$/.test(txt) ? "36pt" : "18pt";
         });
@@ -345,7 +644,7 @@
             awersCard.style.background = `linear-gradient(135deg, ${hexColor} 0%, rgba(0,0,0,0.18) 100%)`;
         }
 
-        colorInput.addEventListener("input", function() {
+        colorInput.addEventListener("input", function () {
             updateCardBackground(colorInput.value);
         });
 
@@ -355,18 +654,27 @@
             yearInput.style.fontSize = "18pt";
             titleInput.innerHTML = "&lt;Tytuł utworu&gt;";
             urlInput.value = "";
+            urlInput.classList.remove("input-error");
             colorInput.value = "#56c68c";
             updateCardBackground("#56c68c");
-            qrcode.makeCode("https://open.spotify.com");
-            
-            // Wyjście z trybu edycji
+            qrcode.makeCode(defaultYoutubeUrl);
+
             currentlyEditedCardId = null;
             addBtn.innerText = "➕ Dodaj kartę do listy";
             addBtn.classList.remove("edit-mode");
             cancelEditBtn.style.display = "none";
         }
 
-        addBtn.addEventListener("click", function() {
+        addBtn.addEventListener("click", function () {
+            const currentRawUrl = urlInput.value.trim();
+
+            if (currentRawUrl === "") {
+                urlInput.classList.add("input-error");
+                urlInput.focus();
+                alert("Błąd: Pole z linkiem YouTube nie może być puste przed dodaniem lub zapisaniem karty!");
+                return;
+            }
+
             const artist = artistInput.innerText.trim();
             const year = yearInput.innerText.trim();
             const title = titleInput.innerText.trim();
@@ -374,10 +682,8 @@
             const currentBg = awersCard.style.background;
             const currentBgColor = awersCard.style.backgroundColor;
             const currentHex = colorInput.value;
-            const currentRawUrl = urlInput.value.trim();
 
             if (currentlyEditedCardId !== null) {
-                // TRYB EDYCJI: Znajdź istniejącą kartę i zaktualizuj jej właściwości
                 const cardIndex = savedCardsCollection.findIndex(c => c.id === currentlyEditedCardId);
                 if (cardIndex !== -1) {
                     savedCardsCollection[cardIndex].artist = artist;
@@ -389,9 +695,9 @@
                     savedCardsCollection[cardIndex].hexColor = currentHex;
                     savedCardsCollection[cardIndex].rawUrl = currentRawUrl;
                     savedCardsCollection[cardIndex].yearFontSize = yearInput.style.fontSize;
+                    savedCardsCollection[cardIndex].validationStatus = "none";
                 }
             } else {
-                // TRYB DODAWANIA: Stwórz zupełnie nową kartę
                 const cardData = {
                     id: Date.now(),
                     artist: artist,
@@ -402,7 +708,8 @@
                     backgroundColor: currentBgColor,
                     hexColor: currentHex,
                     rawUrl: currentRawUrl,
-                    yearFontSize: yearInput.style.fontSize
+                    yearFontSize: yearInput.style.fontSize,
+                    validationStatus: "none"
                 };
                 savedCardsCollection.push(cardData);
             }
@@ -411,7 +718,7 @@
             resetCardToPlaceholders();
         });
 
-        cancelEditBtn.addEventListener("click", function() {
+        cancelEditBtn.addEventListener("click", function () {
             resetCardToPlaceholders();
         });
 
@@ -422,8 +729,19 @@
             savedCardsCollection.forEach((card, index) => {
                 const item = document.createElement("div");
                 item.className = "queue-item";
+
+                let statusBadge = `<span class="qr-status-badge status-none">Niesprawdzony</span>`;
+                if (card.validationStatus === "ok") {
+                    statusBadge = `<span class="qr-status-badge status-ok">✅ QR OK</span>`;
+                } else if (card.validationStatus === "fail") {
+                    statusBadge = `<span class="qr-status-badge status-fail">❌ BŁĄD QR / YT</span>`;
+                }
+
                 item.innerHTML = `
-                    <span><strong>#${index + 1}</strong> ${card.artist} - ${card.title} (${card.year})</span>
+                    <div class="item-info-block">
+                        <span><strong>#${index + 1}</strong> ${card.artist} - ${card.title} (${card.year})</span>
+                        ${statusBadge}
+                    </div>
                     <div class="item-actions">
                         <button class="edit-item-btn" onclick="startEditingCard(${card.id})">✏️ Edytuj</button>
                         <button class="remove-btn" onclick="removeCardFromQueue(${card.id})">Usuń</button>
@@ -433,37 +751,32 @@
             });
         }
 
-        window.startEditingCard = function(id) {
+        window.startEditingCard = function (id) {
             const cardToEdit = savedCardsCollection.find(c => c.id === id);
             if (!cardToEdit) return;
 
             currentlyEditedCardId = id;
-
-            // Wypełnij formularz główny danymi wybranej karty
             artistInput.innerText = cardToEdit.artist;
             yearInput.innerText = cardToEdit.year;
             yearInput.style.fontSize = cardToEdit.yearFontSize;
             titleInput.innerText = cardToEdit.title;
             urlInput.value = cardToEdit.rawUrl;
             colorInput.value = cardToEdit.hexColor;
-            
+
+            urlInput.classList.remove("input-error");
             updateCardBackground(cardToEdit.hexColor);
-            
+
             qrcode.clear();
-            let targetUrl = cardToEdit.rawUrl || "https://open.spotify.com";
+            let targetUrl = cardToEdit.rawUrl || defaultYoutubeUrl;
             qrcode.makeCode(targetUrl);
 
-            // Przełącz przyciski w tryb edycji
             addBtn.innerText = "💾 Zapisz zmiany w karcie";
             addBtn.classList.add("edit-mode");
             cancelEditBtn.style.display = "block";
-            
-            // Przewiń widok do góry do formularza edycji
             window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
-        window.removeCardFromQueue = function(id) {
-            // Jeśli usuwamy kartę, która była w trakcie edycji, zresetuj formularz
+        window.removeCardFromQueue = function (id) {
             if (currentlyEditedCardId === id) {
                 resetCardToPlaceholders();
             }
@@ -471,18 +784,287 @@
             updateQueueUI();
         };
 
-        document.getElementById("download-sheets-btn").addEventListener("click", function() {
-            if(savedCardsCollection.length === 0) {
-                alert("Najpierw dodaj przynajmniej jedną kartę do listy klikając niebieski przycisk!");
+        /* --- SYSTEMOWY TEST QR KODÓW + WALIDACJA DOSTĘPNOŚCI FILMÓW YT Z RAPORTEM --- */
+        testQrBtn.addEventListener("click", async function () {
+            if (savedCardsCollection.length === 0) {
+                alert("Kolejka jest pusta, dodaj karty do przetestowania!");
+                return;
+            }
+
+            const originalBtnText = testQrBtn.innerText;
+            testQrBtn.innerText = "⏳ Testowanie w toku...";
+            testQrBtn.disabled = true;
+
+            const reportSection = document.getElementById("report-section");
+            const reportContainer = document.getElementById("report-table-container");
+            reportSection.style.display = "none";
+            reportContainer.innerHTML = "";
+
+            let passedTests = 0;
+            let failedTests = 0;
+            let failedCardsLogs = [];
+
+            for (let card of savedCardsCollection) {
+                let isUrlAlive = false;
+                let failureReason = "";
+
+                // 1. Wyciągamy ID filmu z linku YouTube
+                const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+                const match = card.rawUrl.match(regExp);
+                const videoId = (match && match[2].length === 11) ? match[2] : null;
+
+                if (videoId) {
+                    try {
+                        const response = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+                        if (response.ok) {
+                            isUrlAlive = true;
+                        } else {
+                            failureReason = `Błąd YT (Status ${response.status}) - Film usunięty lub prywatny`;
+                        }
+                    } catch (error) {
+                        failureReason = "Błąd połączenia / polityki CORS podczas sprawdzania linku";
+                        isUrlAlive = false;
+                    }
+                } else {
+                    if (card.rawUrl.includes("youtube.com/results")) {
+                        isUrlAlive = true;
+                    } else {
+                        failureReason = "Nieprawidłowa struktura adresu URL YouTube (brak ID filmu)";
+                    }
+                }
+
+                // 2. Walidacja generowania kodu QR (z opóźnieniem na wyrenderowanie Canvas)
+                const isQrReadable = await new Promise((resolve) => {
+                    const img = new Image();
+                    img.src = card.qrDataUrl;
+
+                    img.onload = function () {
+                        const tempCanvas = document.createElement("canvas");
+                        const ctx = tempCanvas.getContext("2d");
+                        tempCanvas.width = 150;
+                        tempCanvas.height = 150;
+
+                        ctx.drawImage(img, 0, 0, 150, 150);
+                        const imageData = ctx.getImageData(0, 0, 150, 150);
+
+                        const decodedCode = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: "dontInvert",
+                        });
+
+                        resolve(decodedCode && decodedCode.data === card.rawUrl);
+                    };
+
+                    // W razie błędu ładowania obrazu
+                    img.onerror = () => resolve(false);
+                });
+
+                if (!isQrReadable && isUrlAlive) {
+                    failureReason = "Kod QR wygenerował się niepoprawnie lub asynchroniczny proces renderowania Canvas został przerwany";
+                } else if (!isQrReadable && !isUrlAlive && failureReason === "") {
+                    failureReason = "Zarówno link YT jest uszkodzony, jak i kod QR jest nieczytelny";
+                }
+
+                // 3. Łączony wynik testu
+                if (isQrReadable && isUrlAlive) {
+                    card.validationStatus = "ok";
+                    passedTests++;
+                } else {
+                    card.validationStatus = "fail";
+                    failedTests++;
+
+                    failedCardsLogs.push({
+                        artist: card.artist,
+                        title: card.title,
+                        year: card.year,
+                        url: card.rawUrl,
+                        reason: failureReason
+                    });
+                }
+            }
+
+            updateQueueUI();
+
+            testQrBtn.innerText = originalBtnText;
+            testQrBtn.disabled = false;
+
+            if (failedTests === 0) {
+                alert(`✅ Sukces! Przetestowano ${passedTests} kodów. Wszystkie QR są czytelne, a filmy są DOSTĘPNE na YouTube!`);
+            } else {
+                let tableHtml = `
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; color: #fff; text-align: left;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #ff1744; color: #ff8a80;">
+                                <th style="padding: 6px;">Utwór (Wykonawca - Tytuł)</th>
+                                <th style="padding: 6px;">Błędny URL</th>
+                                <th style="padding: 6px;">Powód błędu</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                failedCardsLogs.forEach(log => {
+                    tableHtml += `
+                        <tr style="border-bottom: 1px solid #443344;">
+                            <td style="padding: 8px 6px;"><strong>${log.artist}</strong> - ${log.title} (${log.year})</td>
+                            <td style="padding: 8px 6px; color: #ff8a80; word-break: break-all;"><code>${log.url}</code></td>
+                            <td style="padding: 8px 6px; color: #ff1744; font-style: italic;">${log.reason}</td>
+                        </tr>
+                    `;
+                });
+
+                tableHtml += `</tbody></table>`;
+                reportContainer.innerHTML = tableHtml;
+                reportSection.style.display = "block";
+
+                window.currentFailedLogsTxt = failedCardsLogs.map((l, i) =>
+                    `[BŁĄD #${i + 1}]\nUtwór: ${l.artist} - ${l.title} (${l.year})\nLink: ${l.url}\nPowód: ${l.reason}\n----------------------------------------`
+                ).join("\n");
+
+                alert(`⚠️ Znaleziono problemy w ${failedTests} kartach! Szczegółowy raport został wygenerowany poniżej listy utworów.`);
+            }
+        });
+
+        /* --- OBSŁUGA POBIERANIA RAPORTU TXT --- */
+        document.getElementById("download-report-btn").addEventListener("click", function () {
+            if (!window.currentFailedLogsTxt) return;
+
+            const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+            const header = `RAPORT Z WALIDACJI LINKÓW YT I KODÓW QR\nData: ${new Date().toLocaleString()}\n========================================\n\n`;
+            const blob = new Blob([header + window.currentFailedLogsTxt], { type: "text/plain;charset=utf-8;" });
+
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `raport_walidacji_${timestamp}.txt`;
+            link.click();
+        });
+
+        /* --- OBSŁUGA EKSPORTU CSV --- */
+        document.getElementById("export-csv-btn").addEventListener("click", function () {
+            if (savedCardsCollection.length === 0) {
+                alert("Kolejka jest pusta. Nie ma czego eksportować!");
+                return;
+            }
+
+            let csvContent = "Wykonawca;Rok;Tytul;URL;Kolor\n";
+            savedCardsCollection.forEach(card => {
+                const artist = card.artist.replace(/;/g, " ");
+                const year = card.year.replace(/;/g, " ");
+                const title = card.title.replace(/;/g, " ");
+                const url = card.rawUrl.replace(/;/g, " ");
+                const color = card.hexColor;
+                csvContent += `${artist};${year};${title};${url};${color}\n`;
+            });
+
+            const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: "text/csv;charset=utf-8;" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "karty_muzyczne.csv";
+            link.click();
+        });
+
+        /* --- OBSŁUGA IMPORTU CSV (Z NADPISYWANIEM) --- */
+        const fileTrigger = document.getElementById("import-csv-trigger");
+        const fileInput = document.getElementById("csv-file-input");
+
+        fileTrigger.addEventListener("click", () => fileInput.click());
+
+        fileInput.addEventListener("change", function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                const text = event.target.result;
+                const lines = text.split(/\r?\n/);
+
+                if (lines.length <= 1) {
+                    alert("Wybrany plik CSV jest pusty lub uszkodzony.");
+                    return;
+                }
+
+                savedCardsCollection = [];
+                resetCardToPlaceholders();
+                document.getElementById("report-section").style.display = "none";
+
+                const hiddenGen = document.getElementById("qr-hidden-generator");
+                hiddenGen.innerHTML = "";
+                let importedCount = 0;
+
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    const columns = line.split(";");
+                    if (columns.length < 4) continue;
+
+                    const artist = columns[0].trim();
+                    const year = columns[1].trim();
+                    const title = columns[2].trim();
+                    const rawUrl = columns[3].trim();
+                    let hexColor = columns[4] ? columns[4].trim() : "#56c68c";
+
+                    if (!/^#[0-9A-F]{6}$/i.test(hexColor)) {
+                        hexColor = "#56c68c";
+                    }
+
+                    if (rawUrl === "") continue;
+
+                    const tempQrDiv = document.createElement("div");
+                    hiddenGen.appendChild(tempQrDiv);
+
+                    const tempQrObj = new QRCode(tempQrDiv, {
+                        text: rawUrl,
+                        width: 150,
+                        height: 150,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+
+                    const qrCanvas = tempQrDiv.querySelector("canvas");
+                    const qrDataUrl = qrCanvas.toDataURL("image/png");
+                    const yearFontSize = /^\d+$/.test(year) ? "36pt" : "18pt";
+
+                    const cardData = {
+                        id: Date.now() + i,
+                        artist: artist || "<Nazwa wykonawcy>",
+                        year: year || "<Rok wydania>",
+                        title: title || "<Tytuł utworu>",
+                        qrDataUrl: qrDataUrl,
+                        backgroundStyle: `linear-gradient(135deg, ${hexColor} 0%, rgba(0, 0, 0, 0.18) 100%)`,
+                        backgroundColor: hexColor,
+                        hexColor: hexColor,
+                        rawUrl: rawUrl,
+                        yearFontSize: yearFontSize,
+                        validationStatus: "none"
+                    };
+
+                    savedCardsCollection.push(cardData);
+                    importedCount++;
+                }
+
+                hiddenGen.innerHTML = "";
+                fileInput.value = "";
+                updateQueueUI();
+                alert(`Pomyślnie zaimportowano ${importedCount} kart z pliku CSV! (Poprzednia lista została zastąpiona).`);
+            };
+
+            reader.readAsText(file, "UTF-8");
+        });
+
+        /* --- GENEROWANIE I POBIERANIE W JEDNYM PLIKU PDF --- */
+        document.getElementById("download-sheets-btn").addEventListener("click", function () {
+            if (savedCardsCollection.length === 0) {
+                alert("Najpierw dodaj przynajmniej jedną kartę do listy lub zaimportuj plik CSV!");
                 return;
             }
 
             const mainBtn = this;
-            mainBtn.innerText = "Trwa przetwarzanie arkuszy A4...";
+            mainBtn.innerText = "Trwa generowanie jednego pliku PDF...";
             mainBtn.disabled = true;
             factory.innerHTML = "";
 
-            const CARDS_PER_A4 = 3; 
+            const CARDS_PER_A4 = 3;
             const totalSheetsNeeded = Math.ceil(savedCardsCollection.length / CARDS_PER_A4);
 
             for (let s = 0; s < totalSheetsNeeded; s++) {
@@ -497,7 +1079,7 @@
                     const data = savedCardsCollection[i];
                     const pair = document.createElement("div");
                     pair.className = "card-pair-print";
-                    
+
                     pair.innerHTML = `
                         <div class="card-print print-front" style="background: ${data.backgroundStyle}; background-color: ${data.backgroundColor};">
                             <div class="flag-pl"><div class="flag-top"></div><div class="flag-bottom"></div></div>
@@ -520,35 +1102,39 @@
                 factory.appendChild(sheetA4);
             }
 
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
             let currentProcessSheet = 0;
 
-            function processAndDownloadNextSheet() {
+            function processNextSheetToPDF() {
                 if (currentProcessSheet >= totalSheetsNeeded) {
-                    mainBtn.innerText = "💾 Pobierz arkusze A4 (JPG)";
+                    pdf.save('Arkusz_Kier_Karty.pdf');
+                    mainBtn.innerText = "💾 Pobierz arkusze A4 (PDF)";
                     mainBtn.disabled = false;
                     factory.innerHTML = "";
                     return;
                 }
 
                 const targetSheetDOM = document.getElementById(`sheet-idx-${currentProcessSheet}`);
-                
+
                 html2canvas(targetSheetDOM, {
-                    scale: 3,
+                    scale: 2.5,
                     useCORS: true,
                     backgroundColor: "#ffffff"
                 }).then(canvas => {
-                    let link = document.createElement('a');
-                    link.download = `Arkusz_A4_Strona_${currentProcessSheet + 1}.jpg`;
-                    link.href = canvas.toDataURL('image/jpeg', 0.95);
-                    link.click();
-
+                    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+                    if (currentProcessSheet > 0) {
+                        pdf.addPage();
+                    }
+                    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
                     currentProcessSheet++;
-                    setTimeout(processAndDownloadNextSheet, 600);
+                    setTimeout(processNextSheetToPDF, 300);
                 });
             }
 
-            setTimeout(processAndDownloadNextSheet, 300);
+            setTimeout(processNextSheetToPDF, 300);
         });
     </script>
 </body>
+
 </html>

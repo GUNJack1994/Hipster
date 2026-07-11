@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'music_parser.dart';
 
 class MusicPlayerScreen extends StatefulWidget {
@@ -12,12 +13,10 @@ class MusicPlayerScreen extends StatefulWidget {
   State<MusicPlayerScreen> createState() => _MusicPlayerScreenState();
 }
 
-// ZMIANA: Dodano SingleTickerProviderStateMixin do obsługi zegara animacji (vsync)
 class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTickerProviderStateMixin {
   VideoPlayerController? _videoController;
   final YoutubeExplode _ytExplode = YoutubeExplode();
   
-  // ZMIANA: Deklaracja kontrolera animacji obrotu płyty
   AnimationController? _animationController;
   
   bool _isLoading = true;
@@ -28,7 +27,6 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTicker
   void initState() {
     super.initState();
     
-    // ZMIANA: Inicjalizacja kontrolera (pełen obrót trwający 4 sekundy)
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
@@ -60,9 +58,8 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTicker
           setState(() {
             _isPlaying = true;
             _isLoading = false;
-            
-            // ZMIANA: Uruchomienie kręcenia płyty po pomyślnym załadowaniu
             _animationController?.repeat();
+            WakelockPlus.enable();
           });
         }
 
@@ -71,11 +68,12 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTicker
             setState(() {
               _isPlaying = _videoController!.value.isPlaying;
               
-              // ZMIANA: Synchronizacja obrotów płyty z rzeczywistym stanem odtwarzacza
               if (_isPlaying && !_isLoading) {
                 _animationController?.repeat();
+                WakelockPlus.enable();
               } else {
                 _animationController?.stop();
+                WakelockPlus.disable();
               }
             });
           }
@@ -89,8 +87,8 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTicker
         setState(() {
           _isLoading = false;
           _hasError = true;
-          // ZMIANA: Zatrzymanie animacji w przypadku błędu
           _animationController?.stop();
+          WakelockPlus.disable();
         });
       }
     }
@@ -106,9 +104,32 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTicker
     }
   }
 
+  // DODANO: Funkcja cofania o 10 sekund
+  void _seekBackward() async {
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      final currentPosition = _videoController!.value.position;
+      final newPosition = currentPosition - const Duration(seconds: 10);
+      
+      // Zabezpieczenie, żeby nie cofnąć poniżej zera
+      await _videoController!.seekTo(newPosition < Duration.zero ? Duration.zero : newPosition);
+    }
+  }
+
+  // DODANO: Funkcja przewijania w przód o 10 sekund
+  void _seekForward() async {
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      final currentPosition = _videoController!.value.position;
+      final totalDuration = _videoController!.value.duration;
+      final newPosition = currentPosition + const Duration(seconds: 10);
+      
+      // Zabezpieczenie, żeby nie przewinąć poza długość utworu
+      await _videoController!.seekTo(newPosition > totalDuration ? totalDuration : newPosition);
+    }
+  }
+
   @override
   void dispose() {
-    // ZMIANA: Czyszczenie kontrolera animacji z pamięci
+    WakelockPlus.disable();
     _animationController?.dispose();
     _videoController?.dispose();
     _ytExplode.close();
@@ -133,13 +154,12 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTicker
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // ZMIANA: Podmiana statycznego kontenera na animowaną płytę winylową
               Container(
                 width: 240,
                 height: 240,
                 decoration: BoxDecoration(
                   color: const Color(0xFF181818),
-                  shape: BoxShape.circle, // Zmiana kształtu na koło
+                  shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
                       color: const Color(0xFFFF0000).withOpacity(0.15),
@@ -158,7 +178,6 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTicker
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
-                            // Główny korpus płyty (rowki winylu)
                             Container(
                               margin: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
@@ -181,7 +200,6 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTicker
                                 border: Border.all(color: Colors.grey[900]!, width: 1),
                               ),
                             ),
-                            // Środek płyty (czerwona naklejka)
                             Container(
                               width: 60,
                               height: 60,
@@ -191,7 +209,6 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTicker
                               ),
                               child: const Icon(Icons.music_note, size: 24, color: Colors.white),
                             ),
-                            // Centralny otwór płyty
                             Container(
                               width: 10,
                               height: 10,
@@ -221,16 +238,37 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTicker
                 
               const SizedBox(height: 30),
               
+              // ZMIANA: Przycisk Play/Pause otoczony kontrolkami do przewijania o 10s
               if (!_isLoading)
-                IconButton(
-                  iconSize: 80,
-                  icon: Icon(
-                    _hasError 
-                        ? Icons.refresh
-                        : (_isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
-                    color: Colors.white,
-                  ),
-                  onPressed: _togglePlayPause,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Przycisk: Tył 10s
+                    IconButton(
+                      iconSize: 48,
+                      icon: const Icon(Icons.replay_10, color: Colors.white),
+                      onPressed: _hasError ? null : _seekBackward,
+                    ),
+                    const SizedBox(width: 20),
+                    // Główny przycisk: Play / Pause / Odśwież
+                    IconButton(
+                      iconSize: 80,
+                      icon: Icon(
+                        _hasError 
+                            ? Icons.refresh
+                            : (_isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
+                        color: Colors.white,
+                      ),
+                      onPressed: _hasError ? _initializePlayer : _togglePlayPause,
+                    ),
+                    const SizedBox(width: 20),
+                    // Przycisk: Przód 10s
+                    IconButton(
+                      iconSize: 48,
+                      icon: const Icon(Icons.forward_10, color: Colors.white),
+                      onPressed: _hasError ? null : _seekForward,
+                    ),
+                  ],
                 ),
             ],
           ),
