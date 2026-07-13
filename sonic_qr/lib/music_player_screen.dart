@@ -1,7 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'music_parser.dart';
 
 class MusicPlayerScreen extends StatefulWidget {
@@ -14,14 +13,13 @@ class MusicPlayerScreen extends StatefulWidget {
 }
 
 class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTickerProviderStateMixin {
-  VideoPlayerController? _videoController;
-  final YoutubeExplode _ytExplode = YoutubeExplode();
-  
+  late YoutubePlayerController _ytController;
   AnimationController? _animationController;
+  StreamSubscription? _streamSubscription; 
   
-  bool _isLoading = true;
-  bool _isPlaying = false;
-  bool _hasError = false;
+  bool _showVideo = false; 
+  bool _isPlaying = false; 
+  double _currentPositionInSeconds = 0.0; 
 
   @override
   void initState() {
@@ -32,248 +30,285 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTicker
       duration: const Duration(seconds: 4),
     );
 
-    _initializePlayer();
-  }
+    _ytController = YoutubePlayerController.fromVideoId(
+      videoId: widget.track.id,
+      autoPlay: true,
+      params: const YoutubePlayerParams(
+        showControls: false, 
+        showFullscreenButton: false,
+        mute: false,
+      ),
+    );
 
-  Future<void> _initializePlayer() async {
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-    });
+    _streamSubscription = _ytController.videoStateStream.listen((state) {
+      if (!mounted) return;
 
-    try {
-      var manifest = await _ytExplode.videos.streams.getManifest(widget.track.id);
-      var muxedStreams = manifest.muxed;
+      setState(() {
+        _currentPositionInSeconds = state.position.inSeconds.toDouble();
+        _isPlaying = _ytController.value.playerState == PlayerState.playing;
 
-      if (muxedStreams.isNotEmpty) {
-        var streamInfo = muxedStreams.sortByBitrate().first;
-
-        _videoController = VideoPlayerController.networkUrl(streamInfo.url);
-        
-        await _videoController!.initialize();
-        await _videoController!.setLooping(true);
-        await _videoController!.play();
-
-        if (mounted) {
-          setState(() {
-            _isPlaying = true;
-            _isLoading = false;
-            _animationController?.repeat();
-            WakelockPlus.enable();
-          });
-        }
-
-        _videoController!.addListener(() {
-          if (mounted) {
-            setState(() {
-              _isPlaying = _videoController!.value.isPlaying;
-              
-              if (_isPlaying && !_isLoading) {
-                _animationController?.repeat();
-                WakelockPlus.enable();
-              } else {
-                _animationController?.stop();
-                WakelockPlus.disable();
-              }
-            });
-          }
-        });
-      } else {
-        throw Exception('Brak dostępnych strumieni typu Muxed');
-      }
-    } catch (e) {
-      print("Błąd odtwarzacza wideo: $e");
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
+        if (_isPlaying) {
+          _animationController?.repeat();
+        } else {
           _animationController?.stop();
-          WakelockPlus.disable();
-        });
-      }
+        }
+      });
+    });
+  }
+
+  void _togglePlayPause() async {
+    if (_isPlaying) {
+      setState(() {
+        _isPlaying = false;
+        _animationController?.stop();
+      });
+      await _ytController.pauseVideo();
+    } else {
+      setState(() {
+        _isPlaying = true;
+        _animationController?.repeat();
+      });
+      await _ytController.playVideo();
     }
   }
 
-  void _togglePlayPause() {
-    if (_videoController != null && _videoController!.value.isInitialized) {
-      if (_isPlaying) {
-        _videoController!.pause();
-      } else {
-        _videoController!.play();
-      }
-    }
-  }
-
-  // DODANO: Funkcja cofania o 10 sekund
-  void _seekBackward() async {
-    if (_videoController != null && _videoController!.value.isInitialized) {
-      final currentPosition = _videoController!.value.position;
-      final newPosition = currentPosition - const Duration(seconds: 10);
+void _seekBackward() async {
+    try {
+      final double newTime = _currentPositionInSeconds - 10;
+      final double targetTime = newTime < 0 ? 0 : newTime;
       
-      // Zabezpieczenie, żeby nie cofnąć poniżej zera
-      await _videoController!.seekTo(newPosition < Duration.zero ? Duration.zero : newPosition);
+      // Wersja 6.x pozwala na przekazanie Duration zamiast gołego double, 
+      // co jest znacznie stabilniejsze w komunikacji z JS Iframe
+      await _ytController.seekTo(
+        seconds: targetTime,
+        allowSeekAhead: true, // Zmusza odtwarzacz do buforowania w przód/tył i grania dalej
+      );
+
+      setState(() {
+        _currentPositionInSeconds = targetTime;
+      });
+    } catch (e) {
+      print("Błąd przewijania wstecz: $e");
     }
   }
 
-  // DODANO: Funkcja przewijania w przód o 10 sekund
-  void _seekForward() async {
-    if (_videoController != null && _videoController!.value.isInitialized) {
-      final currentPosition = _videoController!.value.position;
-      final totalDuration = _videoController!.value.duration;
-      final newPosition = currentPosition + const Duration(seconds: 10);
+void _seekForward() async {
+    try {
+      final double targetTime = _currentPositionInSeconds + 10;
       
-      // Zabezpieczenie, żeby nie przewinąć poza długość utworu
-      await _videoController!.seekTo(newPosition > totalDuration ? totalDuration : newPosition);
+      await _ytController.seekTo(
+        seconds: targetTime,
+        allowSeekAhead: true, // Zmusza odtwarzacz do buforowania w przód/tył i grania dalej
+      );
+
+      setState(() {
+        _currentPositionInSeconds = targetTime;
+      });
+    } catch (e) {
+      print("Błąd przewijania w przód: $e");
     }
   }
 
   @override
   void dispose() {
-    WakelockPlus.disable();
+    _streamSubscription?.cancel(); 
     _animationController?.dispose();
-    _videoController?.dispose();
-    _ytExplode.close();
+    _ytController.close(); 
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+    return YoutubePlayerScaffold(
+      controller: _ytController,
+      builder: (context, player) {
+        return Scaffold(
+          backgroundColor: const Color(0xFF0A0A0A),
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          body: Column(
             children: [
+              // SEKRETNA ZASŁONKA (Z nowym tekstem i ikoną)
               Container(
-                width: 240,
-                height: 240,
+                margin: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 12.0),
+                height: 110,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF181818),
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFF141414),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFFF0000).withOpacity(0.15),
-                      blurRadius: 40,
-                      spreadRadius: 5,
+                      color: Colors.black.withOpacity(0.4),
+                      blurRadius: 8,
                     )
                   ],
                 ),
-                child: _isLoading 
-                    ? const Padding(
-                        padding: EdgeInsets.all(60.0),
-                        child: CircularProgressIndicator(color: Color(0xFFFF0000)),
-                      )
-                    : RotationTransition(
-                        turns: _animationController!,
-                        child: Stack(
-                          alignment: Alignment.center,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  clipBehavior: Clip.antiAlias,
+                  child: GestureDetector(
+                    onLongPress: () {
+                      setState(() {
+                        _showVideo = !_showVideo;
+                      });
+                      Feedback.forLongPress(context); 
+                    },
+                    child: AnimatedCrossFade(
+                      duration: const Duration(milliseconds: 300),
+                      crossFadeState: _showVideo ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                      
+                      // STAN 1: Nowy design z ikoną znaku zapytania
+                      firstChild: Container(
+                        width: double.infinity,
+                        height: 110,
+                        color: const Color(0xFF151515),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Container(
-                              margin: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.grey[900]!, width: 2),
-                                color: const Color(0xFF0D0D0D),
-                              ),
+                            Icon(
+                              Icons.help_outline_rounded, // Ładna, zaokrąglona ikona znaku zapytania
+                              color: Colors.grey, 
+                              size: 22,
                             ),
-                            Container(
-                              margin: const EdgeInsets.all(35),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.grey[900]!, width: 1),
-                              ),
-                            ),
-                            Container(
-                              margin: const EdgeInsets.all(65),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.grey[900]!, width: 1),
-                              ),
-                            ),
-                            Container(
-                              width: 60,
-                              height: 60,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFFF0000),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.music_note, size: 24, color: Colors.white),
-                            ),
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF181818),
-                                shape: BoxShape.circle,
+                            SizedBox(width: 10),
+                            Text(
+                              'Press to see video',
+                              style: TextStyle(
+                                color: Colors.grey, 
+                                fontSize: 14, 
+                                fontWeight: FontWeight.w400, 
+                                letterSpacing: 0.3,
                               ),
                             ),
                           ],
                         ),
                       ),
-              ),
-              const SizedBox(height: 40),
-              const Text(
-                'Odtwarzam z kodu QR',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              
-              if (_hasError)
-                const Text(
-                  'Nie udało się odtworzyć tego utworu. Spróbuj innego kodu.',
-                  style: TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.w500),
-                  textAlign: TextAlign.center,
-                ),
-                
-              const SizedBox(height: 30),
-              
-              // ZMIANA: Przycisk Play/Pause otoczony kontrolkami do przewijania o 10s
-              if (!_isLoading)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Przycisk: Tył 10s
-                    IconButton(
-                      iconSize: 48,
-                      icon: const Icon(Icons.replay_10, color: Colors.white),
-                      onPressed: _hasError ? null : _seekBackward,
-                    ),
-                    const SizedBox(width: 20),
-                    // Główny przycisk: Play / Pause / Odśwież
-                    IconButton(
-                      iconSize: 80,
-                      icon: Icon(
-                        _hasError 
-                            ? Icons.refresh
-                            : (_isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
-                        color: Colors.white,
+                      
+                      // STAN 2: Odtwarzacz wideo
+                      secondChild: SizedBox(
+                        width: double.infinity,
+                        height: 110,
+                        child: FittedBox(
+                          fit: BoxFit.cover,
+                          child: SizedBox(
+                            width: 220,
+                            height: 110,
+                            child: player,
+                          ),
+                        ),
                       ),
-                      onPressed: _hasError ? _initializePlayer : _togglePlayPause,
                     ),
-                    const SizedBox(width: 20),
-                    // Przycisk: Przód 10s
-                    IconButton(
-                      iconSize: 48,
-                      icon: const Icon(Icons.forward_10, color: Colors.white),
-                      onPressed: _hasError ? null : _seekForward,
-                    ),
-                  ],
+                  ),
                 ),
+              ),
+              
+              Expanded(
+                child: Center(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Kręcąca się płyta winylowa
+                          Container(
+                            width: 220,
+                            height: 220,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF181818),
+                              shape: BoxShape.circle, 
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFFF0000).withOpacity(0.15),
+                                  blurRadius: 35,
+                                  spreadRadius: 2,
+                                )
+                              ],
+                            ),
+                            child: RotationTransition(
+                              turns: _animationController!,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Container(
+                                    margin: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.grey[900]!, width: 2),
+                                      color: const Color(0xFF0D0D0D),
+                                    ),
+                                  ),
+                                  Container(
+                                    margin: const EdgeInsets.all(30),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.grey[900]!, width: 1),
+                                    ),
+                                  ),
+                                  Container(
+                                    width: 55,
+                                    height: 55,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFFF0000),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.music_note, size: 22, color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 40),
+                          const Text(
+                            'Odtwarzam z kodu QR',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                            textAlign: TextAlign.center,
+                          ),
+                          
+                          const SizedBox(height: 40),
+                          
+                          // Panel sterowania
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                iconSize: 40,
+                                icon: const Icon(Icons.replay_10, color: Colors.white),
+                                onPressed: _seekBackward,
+                              ),
+                              const SizedBox(width: 20),
+                              IconButton(
+                                iconSize: 70,
+                                icon: Icon(
+                                  _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                                  color: Colors.white,
+                                ),
+                                onPressed: _togglePlayPause,
+                              ),
+                              const SizedBox(width: 20),
+                              IconButton(
+                                iconSize: 40,
+                                icon: const Icon(Icons.forward_10, color: Colors.white),
+                                onPressed: _seekForward,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
