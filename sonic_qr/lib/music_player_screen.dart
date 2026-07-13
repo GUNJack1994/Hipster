@@ -12,19 +12,20 @@ class MusicPlayerScreen extends StatefulWidget {
   State<MusicPlayerScreen> createState() => _MusicPlayerScreenState();
 }
 
-class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTickerProviderStateMixin {
+class _MusicPlayerScreenState extends State<MusicPlayerScreen>
+    with SingleTickerProviderStateMixin {
   late YoutubePlayerController _ytController;
   AnimationController? _animationController;
-  StreamSubscription? _streamSubscription; 
-  
-  bool _showVideo = false; 
-  bool _isPlaying = false; 
-  double _currentPositionInSeconds = 0.0; 
+  StreamSubscription? _streamSubscription;
+
+  bool _showVideo = false;
+  bool _isPlaying = false;
+  double _currentPositionInSeconds = 0.0;
 
   @override
   void initState() {
     super.initState();
-    
+
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
@@ -34,7 +35,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTicker
       videoId: widget.track.id,
       autoPlay: true,
       params: const YoutubePlayerParams(
-        showControls: false, 
+        showControls: false,
         showFullscreenButton: false,
         mute: false,
       ),
@@ -72,16 +73,14 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with SingleTicker
     }
   }
 
-void _seekBackward() async {
+  void _seekBackward() async {
     try {
       final double newTime = _currentPositionInSeconds - 10;
       final double targetTime = newTime < 0 ? 0 : newTime;
-      
-      // Wersja 6.x pozwala na przekazanie Duration zamiast gołego double, 
-      // co jest znacznie stabilniejsze w komunikacji z JS Iframe
+
       await _ytController.seekTo(
         seconds: targetTime,
-        allowSeekAhead: true, // Zmusza odtwarzacz do buforowania w przód/tył i grania dalej
+        allowSeekAhead: true,
       );
 
       setState(() {
@@ -92,13 +91,13 @@ void _seekBackward() async {
     }
   }
 
-void _seekForward() async {
+  void _seekForward() async {
     try {
       final double targetTime = _currentPositionInSeconds + 10;
-      
+
       await _ytController.seekTo(
         seconds: targetTime,
-        allowSeekAhead: true, // Zmusza odtwarzacz do buforowania w przód/tył i grania dalej
+        allowSeekAhead: true,
       );
 
       setState(() {
@@ -111,9 +110,9 @@ void _seekForward() async {
 
   @override
   void dispose() {
-    _streamSubscription?.cancel(); 
+    _streamSubscription?.cancel();
     _animationController?.dispose();
-    _ytController.close(); 
+    _ytController.close();
     super.dispose();
   }
 
@@ -127,16 +126,20 @@ void _seekForward() async {
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
+            // UPROSZCZONE I NAPRAWIONE: Nowoczesna strzałka powrotu do menu głównego
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 22),
               onPressed: () => Navigator.pop(context),
             ),
           ),
           body: Column(
             children: [
-              // SEKRETNA ZASŁONKA (Z nowym tekstem i ikoną)
+              // SEKRETNA ZASŁONKA (Z ikoną YouTube i nowym tekstem)
               Container(
-                margin: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 12.0),
+                margin: const EdgeInsets.symmetric(
+                  horizontal: 40.0,
+                  vertical: 12.0,
+                ),
                 height: 110,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
@@ -145,7 +148,7 @@ void _seekForward() async {
                     BoxShadow(
                       color: Colors.black.withOpacity(0.4),
                       blurRadius: 8,
-                    )
+                    ),
                   ],
                 ),
                 child: ClipRRect(
@@ -156,40 +159,53 @@ void _seekForward() async {
                       setState(() {
                         _showVideo = !_showVideo;
                       });
-                      Feedback.forLongPress(context); 
+                      Feedback.forLongPress(context);
                     },
                     child: AnimatedCrossFade(
                       duration: const Duration(milliseconds: 300),
-                      crossFadeState: _showVideo ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                      
-                      // STAN 1: Nowy design z ikoną znaku zapytania
+                      crossFadeState: _showVideo
+                          ? CrossFadeState.showSecond
+                          : CrossFadeState.showFirst,
+
+                      // STAN 1: Oficjalny wygląd z customową ikoną YouTube i napisem
                       firstChild: Container(
                         width: double.infinity,
                         height: 110,
                         color: const Color(0xFF151515),
-                        child: const Row(
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.help_outline_rounded, // Ładna, zaokrąglona ikona znaku zapytania
-                              color: Colors.grey, 
-                              size: 22,
+                            // Dokładne odwzorowanie logotypu ze zdjęcia
+                            Container(
+                              width: 38,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFF0000), // Żywy czerwony kolor YT
+                                borderRadius: BorderRadius.circular(8), // Zaokrąglone rogi "telewizorka"
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.play_arrow_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
                             ),
-                            SizedBox(width: 10),
-                            Text(
-                              'Press to see video',
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Press to see video on YouTube',
                               style: TextStyle(
-                                color: Colors.grey, 
-                                fontSize: 14, 
-                                fontWeight: FontWeight.w400, 
+                                color: Colors.grey,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
                                 letterSpacing: 0.3,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      
-                      // STAN 2: Odtwarzacz wideo
+
+                      // STAN 2: Odtwarzacz wideo pod spodem
                       secondChild: SizedBox(
                         width: double.infinity,
                         height: 110,
@@ -206,7 +222,7 @@ void _seekForward() async {
                   ),
                 ),
               ),
-              
+
               Expanded(
                 child: Center(
                   child: SingleChildScrollView(
@@ -221,13 +237,13 @@ void _seekForward() async {
                             height: 220,
                             decoration: BoxDecoration(
                               color: const Color(0xFF181818),
-                              shape: BoxShape.circle, 
+                              shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
                                   color: const Color(0xFFFF0000).withOpacity(0.15),
                                   blurRadius: 35,
                                   spreadRadius: 2,
-                                )
+                                ),
                               ],
                             ),
                             child: RotationTransition(
@@ -239,7 +255,10 @@ void _seekForward() async {
                                     margin: const EdgeInsets.all(6),
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.grey[900]!, width: 2),
+                                      border: Border.all(
+                                        color: Colors.grey[900]!,
+                                        width: 2,
+                                      ),
                                       color: const Color(0xFF0D0D0D),
                                     ),
                                   ),
@@ -247,7 +266,10 @@ void _seekForward() async {
                                     margin: const EdgeInsets.all(30),
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.grey[900]!, width: 1),
+                                      border: Border.all(
+                                        color: Colors.grey[900]!,
+                                        width: 1,
+                                      ),
                                     ),
                                   ),
                                   Container(
@@ -257,36 +279,49 @@ void _seekForward() async {
                                       color: Color(0xFFFF0000),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.music_note, size: 22, color: Colors.white),
+                                    child: const Icon(
+                                      Icons.music_note,
+                                      size: 22,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
                           ),
-                          
+
                           const SizedBox(height: 40),
                           const Text(
                             'Odtwarzam z kodu QR',
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                             textAlign: TextAlign.center,
                           ),
-                          
+
                           const SizedBox(height: 40),
-                          
+
                           // Panel sterowania
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               IconButton(
                                 iconSize: 40,
-                                icon: const Icon(Icons.replay_10, color: Colors.white),
+                                icon: const Icon(
+                                  Icons.replay_10,
+                                  color: Colors.white,
+                                ),
                                 onPressed: _seekBackward,
                               ),
                               const SizedBox(width: 20),
                               IconButton(
                                 iconSize: 70,
                                 icon: Icon(
-                                  _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                                  _isPlaying
+                                      ? Icons.pause_circle_filled
+                                      : Icons.play_circle_filled,
                                   color: Colors.white,
                                 ),
                                 onPressed: _togglePlayPause,
@@ -294,7 +329,10 @@ void _seekForward() async {
                               const SizedBox(width: 20),
                               IconButton(
                                 iconSize: 40,
-                                icon: const Icon(Icons.forward_10, color: Colors.white),
+                                icon: const Icon(
+                                  Icons.forward_10,
+                                  color: Colors.white,
+                                ),
                                 onPressed: _seekForward,
                               ),
                             ],

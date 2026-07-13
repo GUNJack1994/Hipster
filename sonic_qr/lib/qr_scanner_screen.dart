@@ -30,7 +30,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     setState(() {
       this.controller = controller;
     });
-    
+
     controller.scannedDataStream.listen((scanData) async {
       if (isProcessing || scanData.code == null) return;
 
@@ -43,11 +43,11 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
       final parsed = MusicParser.parse(scanData.code!);
 
-      // Sprawdzamy czy to YouTube, ale NIE pokazujemy już żadnego panelu 
+      // Sprawdzamy czy to YouTube, ale NIE pokazujemy już żadnego panelu
       // z informacjami, żeby utrzymać 100% tajemnicy przed odtworzeniem!
       if (parsed.provider == MusicProvider.youtube) {
         if (!mounted) return;
-        
+
         // Przechodzimy bezpośrednio do odtwarzacza
         Navigator.push(
           context,
@@ -71,7 +71,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             duration: Duration(seconds: 2),
           ),
         );
-        
+
         await Future.delayed(const Duration(seconds: 2));
         await controller.resumeCamera();
         setState(() {
@@ -98,14 +98,42 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             key: qrKey,
             onQRViewCreated: _onQRViewCreated,
             overlay: QrScannerOverlayShape(
-              borderColor: const Color(0xFFFF0000), // Zmieniono na czerwony pasujący do motywu
+              borderColor: const Color(
+                0xFFFF0000,
+              ), // Czerwony pasujący do motywu
               borderRadius: 16,
               borderLength: 30,
               borderWidth: 8,
               cutOutSize: 260,
             ),
           ),
-          
+
+          // STRZAŁKA COFANIA DO MENU GŁÓWNEGO
+          Positioned(
+            top: 50,
+            left: 16,
+            child: SafeArea(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(
+                    0.5,
+                  ), // Półprzezroczyste tło dla lepszej widoczności na podglądzie z kamery
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context); // Powrót do MainMenuScreen
+                  },
+                ),
+              ),
+            ),
+          ),
+
           // Tekst pomocniczy na górze ekranu
           const Positioned(
             top: 60,
@@ -115,8 +143,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               'Skieruj aparat na kod QR',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white, 
-                fontSize: 18, 
+                color: Colors.white,
+                fontSize: 18,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.5,
               ),
