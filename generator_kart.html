@@ -1046,10 +1046,10 @@
                     tempWrapper.innerHTML = `
                         <div class="card-print print-front" style="width: 60mm; height: 90mm;">
                             <div class="front-header">Quiz Muzyczny</div>
-                            <div class="artist">${card.artist}</div>
+                            <div class="artist">${card.year}</div>
                             <div class="title">${card.title}</div>
                             <div class="front-divider"></div>
-                            <div class="year" style="font-size: ${card.yearFontSize || '18pt'};">${card.year}</div>
+                            <div class="year" style="font-size: ${card.yearFontSize || '18pt'};">${card.artist}</div>
                         </div>
                     `;
                     factory.appendChild(tempWrapper);
