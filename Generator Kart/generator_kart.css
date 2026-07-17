@@ -1,0 +1,682 @@
+/* --- STYLE INTERFEJSU UŻYTKOWNIKA --- */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #0f172a;
+    color: #f1f5f9;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+h1 {
+    margin-bottom: 25px;
+    font-weight: 300;
+    color: #e0a96d;
+    letter-spacing: 1px;
+}
+
+.dashboard {
+    background-color: #1e293b;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    margin-bottom: 30px;
+    width: 100%;
+    max-width: 650px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    border: 1px solid #334155;
+}
+
+.row {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.flex-grow {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.dashboard input[type="text"] {
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #475569;
+    background-color: #0f172a;
+    color: #fff;
+    font-size: 16px;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.dashboard input[type="text"].input-error {
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
+.btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+}
+
+.btn-row {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.dashboard button {
+    flex: 1;
+    padding: 14px;
+    border-radius: 6px;
+    border: none;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+#add-btn {
+    background-color: #e0a96d;
+    color: #0b132b;
+}
+
+#add-btn:hover {
+    background-color: #cca173;
+}
+
+#add-btn.edit-mode {
+    background-color: #10b981;
+    color: #fff;
+}
+
+#add-btn.edit-mode:hover {
+    background-color: #059669;
+}
+
+#cancel-edit-btn {
+    background-color: #64748b;
+    color: #fff;
+    display: none;
+}
+
+#cancel-edit-btn:hover {
+    background-color: #475569;
+}
+
+#download-sheets-btn {
+    background-color: #38bdf8;
+    color: #0f172a;
+}
+
+#download-sheets-btn:hover {
+    background-color: #0ea5e9;
+}
+
+.csv-actions-row {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    margin-top: 5px;
+}
+
+.btn-csv {
+    background-color: #475569;
+    color: #fff;
+    font-size: 13px !important;
+    padding: 10px !important;
+}
+
+.btn-csv:hover {
+    background-color: #334155;
+}
+
+#csv-file-input {
+    display: none;
+}
+
+.queue-section {
+    width: 100%;
+    max-width: 650px;
+    background: #1e293b;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #334155;
+}
+
+.queue-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #334155;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+}
+
+.queue-header-row h3 {
+    margin: 0;
+    color: #e2e8f0;
+}
+
+#test-qr-btn {
+    background-color: #e2e8f0;
+    color: #0f172a;
+    font-size: 12px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+#test-qr-btn:hover {
+    background-color: #cbd5e1;
+}
+
+.queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.queue-item {
+    background: #0f172a;
+    padding: 10px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    border: 1px solid #1e293b;
+}
+
+.item-info-block {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.qr-status-badge {
+    font-size: 11px;
+    font-weight: bold;
+    margin-top: 2px;
+}
+
+.status-none {
+    color: #94a3b8;
+}
+
+.status-ok {
+    color: #4444ff;
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    padding: 2px 6px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.status-fail {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.item-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.edit-item-btn {
+    background: #f59e0b;
+    color: #0f172a;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.edit-item-btn:hover {
+    background: #d97706;
+}
+
+.remove-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.remove-btn:hover {
+    background: #dc2626;
+}
+
+.preview-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+/* --- BUDOWA PARY KARTY (NOWY DESIGN) --- */
+.card-pair-print {
+    display: flex;
+    width: 120mm;
+    height: 90mm;
+    border: 1px solid #1e2541;
+    box-sizing: border-box;
+    background: #0b132b;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    border-radius: 8px;
+}
+
+.card-print {
+    width: 60mm;
+    height: 90mm;
+    position: relative;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* AWERS DRUK - CAŁKOWITY ODWRÓT OD HITSTERA */
+.print-front {
+    padding: 8mm 5mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    text-align: center;
+    background: #0b132b;
+    background: radial-gradient(circle at 50% 20%, #1c2541 0%, #0b132b 80%);
+}
+
+/* Złote ramki wewnętrzne */
+.print-front::before,
+.print-back::before {
+    content: "";
+    position: absolute;
+    top: 3mm;
+    left: 3mm;
+    right: 3mm;
+    bottom: 3mm;
+    border: 1px solid rgba(224, 169, 109, 0.25);
+    border-radius: 6px;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.front-header {
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #e0a96d;
+    margin-bottom: 8mm;
+    font-weight: 600;
+    font-family: Arial, sans-serif;
+    z-index: 5;
+}
+
+.editable-text {
+    width: 100%;
+    outline: none;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    z-index: 20;
+    word-wrap: break-word;
+}
+
+.preview-section .editable-text {
+    border: 1px dashed transparent;
+}
+
+.preview-section .editable-text:hover,
+.preview-section .editable-text:focus {
+    border: 1px dashed rgba(224, 169, 109, 0.5);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.artist {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.2;
+    margin-bottom: 2mm;
+    letter-spacing: -0.3px;
+}
+
+.title {
+    font-size: 10pt;
+    font-style: italic;
+    color: #9ab0c7;
+    line-height: 1.3;
+    padding: 0 2mm;
+    margin-bottom: 6mm;
+}
+
+/* Złoty element geometryczny zamiast płyty winylowej */
+.front-divider {
+    width: 25mm;
+    height: 1px;
+    background: linear-gradient(to right, transparent, #e0a96d, transparent);
+    margin-bottom: 8mm;
+    z-index: 5;
+}
+
+.year {
+    font-weight: 800;
+    color: #e0a96d;
+    letter-spacing: 1px;
+    display: inline-block;
+    padding: 2mm 5mm;
+    border-top: 1px solid rgba(224, 169, 109, 0.2);
+    border-bottom: 1px solid rgba(224, 169, 109, 0.2);
+}
+
+/* REWERS DRUK */
+.print-back {
+    border-left: 1px dashed rgba(224, 169, 109, 0.3);
+    background-color: #0f172a;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 8mm 5mm;
+}
+
+.back-title {
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #94a3b8;
+    margin-bottom: 6mm;
+    font-family: Arial, sans-serif;
+    z-index: 5;
+}
+
+.qr-wrapper {
+    position: relative;
+    z-index: 10;
+    background: white;
+    padding: 3mm;
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    border: 2px solid #e0a96d;
+    /* Złota otoczka */
+}
+
+.qr-wrapper canvas,
+.qr-wrapper img {
+    width: 26mm !important;
+    height: 26mm !important;
+}
+
+/* --- ARKUSZ A4 DO EKSPORTU --- */
+.a4-sheet {
+    width: 297mm;
+    height: 210mm;
+    background-color: #ffffff;
+    position: absolute;
+    left: -9999mm;
+    top: -9999mm;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.a4-sheet * {
+    box-sizing: border-box;
+}
+
+/* --- PASEK ŁADOWANIA I KOMUNIKATY O BŁĘDACH --- */
+.loading-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(15, 23, 42, 0.95);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.loading-overlay.active {
+    display: flex;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(224, 169, 109, 0.2);
+    border-top-color: #e0a96d;
+    border-right-color: #e0a96d;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-text {
+    color: #e0a96d;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.loading-progress {
+    width: 200px;
+    height: 6px;
+    background-color: rgba(224, 169, 109, 0.2);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.loading-progress-bar {
+    height: 100%;
+    background-color: #e0a96d;
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 3px;
+    box-shadow: 0 0 10px rgba(224, 169, 109, 0.5);
+}
+
+.error-modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #1e293b;
+    border: 2px solid #ef4444;
+    border-radius: 12px;
+    padding: 24px;
+    z-index: 1001;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+}
+
+.error-modal.active {
+    display: block;
+}
+
+.error-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 999;
+}
+
+.error-modal-overlay.active {
+    display: block;
+}
+
+.error-modal h2 {
+    margin: 0 0 12px 0;
+    color: #ef4444;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.error-modal-content {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 16px;
+}
+
+.error-item {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid #ef4444;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #fca5a5;
+}
+
+.error-item-title {
+    font-weight: bold;
+    color: #ff6b6b;
+}
+
+.error-modal-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.error-modal button {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-close-error {
+    background-color: #64748b;
+    color: #fff;
+}
+
+.btn-close-error:hover {
+    background-color: #475569;
+}
+
+.btn-retry-import {
+    background-color: #e0a96d;
+    color: #0f172a;
+}
+
+.btn-retry-import:hover {
+    background-color: #cca173;
+}
+
+.success-notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #10b981;
+    color: white;
+    padding: 16px 24px;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    z-index: 1002;
+    animation: slideIn 0.3s ease-out, slideOut 0.3s ease-out 4.7s;
+    max-width: 300px;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+}
+
+/* --- DROPDOWN DLA RAPORTU BŁĘDÓW --- */
+.report-dropdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 12px;
+    background-color: rgba(255, 23, 68, 0.1);
+    border-radius: 6px;
+    user-select: none;
+    transition: background-color 0.2s;
+}
+
+.report-dropdown-header:hover {
+    background-color: rgba(255, 23, 68, 0.15);
+}
+
+.report-dropdown-icon {
+    display: inline-block;
+    transition: transform 0.3s ease;
+    font-size: 16px;
+}
+
+.report-dropdown-icon.collapsed {
+    transform: rotate(-90deg);
+}
+
+.report-dropdown-content {
+    max-height: 500px;
+    overflow-y: auto;
+    margin-top: 10px;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+    opacity: 1;
+}
+
+.report-dropdown-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+}

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator Arkuszy A4 - Premium Music Cards</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <link rel="stylesheet" href="generator_kart.css">
+</head>
+
+<body>
+
+    <h1>Generator Arkuszy A4 - Premium Music Cards</h1>
+
+    <div class="dashboard">
+        <div class="row">
+            <div class="flex-grow">
+                <label for="url-input">Wklej link z YouTube dla kodu QR:</label>
+                <input type="text" id="url-input" placeholder="Wklej adres URL filmu z YouTube..." value="">
+            </div>
+        </div>
+        <div class="btn-group">
+            <div class="btn-row">
+                <button id="add-btn">➕ Dodaj kartę do listy</button>
+                <button id="cancel-edit-btn">Anuluj edycję</button>
+            </div>
+            <button id="download-sheets-btn">💾 Pobierz arkusze A4 (PDF)</button>
+
+            <div class="csv-actions-row">
+                <button id="export-csv-btn" class="btn-csv">📤 Eksportuj listę do CSV</button>
+                <button id="import-csv-trigger" class="btn-csv">📥 Importuj listę z CSV</button>
+                <input type="file" id="csv-file-input" accept=".csv">
+            </div>
+        </div>
+    </div>
+
+    <div id="qr-hidden-generator" style="display:none;"></div>
+
+    <div class="queue-section">
+        <div class="queue-header-row">
+            <h3>Lista kart w kolejce do druku (<span id="queue-count">0</span>)</h3>
+            <button id="test-qr-btn" title="Automatyczny test odczytu kodów QR oraz dostępności filmów">🔍 Przetestuj
+                poprawność kodów QR</button>
+        </div>
+        <div class="queue-list" id="queue-container"></div>
+    </div>
+
+    <div id="report-section"
+        style="display: none; width: 100%; max-width: 650px; background: #2a1f2d; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ff1744;">
+        <div class="report-dropdown-header" onclick="toggleReportDropdown()">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <h3 style="margin: 0; color: #ff1744; font-size: 16px;">📋 Raport - Znaleziono błędy (<span id="error-count">0</span>)</h3>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <span class="report-dropdown-icon" id="dropdown-icon">▼</span>
+                <button id="download-report-btn"
+                    style="background-color: #ff1744; color: #fff; font-size: 12px; padding: 6px 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">💾
+                    Pobierz .TXT</button>
+            </div>
+        </div>
+        <div class="report-dropdown-content" id="report-dropdown-content">
+            <div id="report-table-container"></div>
+        </div>
+    </div>
+
+    <div class="preview-section">
+        <span style="color: #94a3b8;">👇 Edytuj dane bezpośrednio na karcie poniżej przed dodaniem jej do listy:</span>
+        <div class="cards-container">
+            <div class="card-pair-print" id="live-preview-pair">
+                <div class="card-print print-front" id="awers-card">
+                    <div class="front-header">Quiz Muzyczny</div>
+                    <div class="editable-text artist" id="txt-artist" contenteditable="true">&lt;Nazwa wykonawcy&gt;
+                    </div>
+                    <div class="editable-text title" id="txt-title" contenteditable="true">&lt;Tytuł utworu&gt;</div>
+                    <div class="front-divider"></div>
+                    <div class="editable-text year" id="txt-year" contenteditable="true" style="font-size: 18pt;">
+                        &lt;Rok wydania&gt;</div>
+                </div>
+
+                <div class="card-print print-back">
+                    <div class="back-title">Zeskanuj utwór</div>
+                    <div class="qr-wrapper">
+                        <div id="qrcode"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="sheet-generator-factory"></div>
+
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loading-text">Ładowanie pliku CSV...</div>
+        <div class="loading-progress">
+            <div class="loading-progress-bar" id="loading-progress-bar"></div>
+        </div>
+    </div>
+
+    <div class="error-modal-overlay" id="error-modal-overlay"></div>
+    <div class="error-modal" id="error-modal">
+        <h2>
+            <span>⚠️</span>
+            <span id="error-title">Błąd podczas importu pliku</span>
+        </h2>
+        <div class="error-modal-content" id="error-modal-content"></div>
+        <div class="error-modal-buttons">
+            <button class="btn-close-error" onclick="closeErrorModal()">Zamknij</button>
+            <button class="btn-retry-import" onclick="document.getElementById('csv-file-input').click(); closeErrorModal();">Spróbuj ponownie</button>
+        </div>
+    </div>
+
+    <script src="generator_kart.js"></script>
+</body>
+
+</html>

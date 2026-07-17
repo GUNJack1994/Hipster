@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 import 'music_parser.dart';
 import 'music_player_screen.dart';
+import 'translations.dart';
 
 class QrScannerScreen extends StatefulWidget {
   const QrScannerScreen({super.key});
@@ -38,47 +39,68 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         isProcessing = true;
       });
 
-      // Natychmiast zatrzymujemy skaner, żeby nie czytał kodu wielokrotnie
-      await controller.pauseCamera();
+      try {
+        // Natychmiast zatrzymujemy skaner, żeby zapobiec pętli wielokrotnego odczytu
+        await controller.pauseCamera();
 
-      final parsed = MusicParser.parse(scanData.code!);
+        // Bezpieczne parsowanie z użyciem nowej logiki sanityzacji
+        final parsed = MusicParser.parse(scanData.code!);
 
-      // Sprawdzamy czy to YouTube, ale NIE pokazujemy już żadnego panelu
-      // z informacjami, żeby utrzymać 100% tajemnicy przed odtworzeniem!
-      if (parsed.provider == MusicProvider.youtube) {
-        if (!mounted) return;
+        if (parsed.provider == MusicProvider.youtube && parsed.id.isNotEmpty) {
+          if (!mounted) return;
 
-        // Przechodzimy bezpośrednio do odtwarzacza
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MusicPlayerScreen(track: parsed),
-          ),
-        ).then((_) {
-          // Po powrocie z ekranu odtwarzacza (np. kliknięcie strzałki wstecz)
-          // resetujemy stan i włączamy aparat ponownie
-          setState(() {
-            isProcessing = false;
-          });
-          controller.resumeCamera();
-        });
-      } else {
-        // Obsługa błędnego kodu QR
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Zeskanowany kod nie zawiera linku YouTube!'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+          // Przechodzimy bezpośrednio do odtwarzacza
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MusicPlayerScreen(track: parsed),
+            ),
+          );
 
+          // Po powrocie z odtwarzacza przywracamy aparat do życia
+          _resetScanner();
+        } else {
+          // Kod nie przeszedł weryfikacji bezpieczeństwa (np. to nie był YouTube)
+          _showErrorSnackbar(S.invalidQr);
+          await Future.delayed(const Duration(seconds: 2));
+          _resetScanner();
+        }
+      } catch (e) {
+        // Globalny "bezpiecznik" – w razie jakiegokolwiek błędu aplikacja nie crashuje
+        debugPrint("Krytyczny błąd skanera: $e");
+        _showErrorSnackbar(S.scanError);
         await Future.delayed(const Duration(seconds: 2));
-        await controller.resumeCamera();
-        setState(() {
-          isProcessing = false;
-        });
+        _resetScanner();
       }
     });
+  }
+
+  // Pomocnicza metoda do bezpiecznego resetowania stanu skanera
+  void _resetScanner() {
+    if (!mounted) return;
+    setState(() {
+      isProcessing = false;
+    });
+    controller?.resumeCamera();
+  }
+
+  // Bezpieczne wyświetlanie powiadomienia o błędzie
+  void _showErrorSnackbar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: const Color(0xFFD32F2F), // Czerwony kolor błędu
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -115,9 +137,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             child: SafeArea(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(
-                    0.5,
-                  ), // Półprzezroczyste tło dla lepszej widoczności na podglądzie z kamery
+                  color: Colors.black.withValues(
+                    alpha: 0.5,
+                  ), // Półprzezroczyste tło
                   shape: BoxShape.circle,
                 ),
                 child: IconButton(
@@ -135,14 +157,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           ),
 
           // Tekst pomocniczy na górze ekranu
-          const Positioned(
+          Positioned(
             top: 60,
             left: 0,
             right: 0,
             child: Text(
-              'Skieruj aparat na kod QR',
+              S.scanInstruction,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w600,

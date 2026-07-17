@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'music_parser.dart';
+import 'translations.dart';
 
 class MusicPlayerScreen extends StatefulWidget {
   final ParsedTrack track;
@@ -146,7 +147,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
                   color: const Color(0xFF141414),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.4),
+                      color: Colors.black.withValues(alpha: 0.4),
                       blurRadius: 8,
                     ),
                   ],
@@ -192,8 +193,8 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
                               ),
                             ),
                             const SizedBox(width: 12),
-                            const Text(
-                              'Press to see video on YouTube',
+                            Text(
+                              S.tapToReveal,
                               style: TextStyle(
                                 color: Colors.grey,
                                 fontSize: 13,
@@ -240,7 +241,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFFFF0000).withOpacity(0.15),
+                                  color: const Color(0xFFFF0000).withValues(alpha: 0.15),
                                   blurRadius: 35,
                                   spreadRadius: 2,
                                 ),
@@ -291,8 +292,8 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
                           ),
 
                           const SizedBox(height: 40),
-                          const Text(
-                            'Odtwarzam z kodu QR',
+                          Text(
+                            S.secretTrack,
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,

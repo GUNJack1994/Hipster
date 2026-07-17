@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:sonic_qr/qr_scanner_screen.dart';
+import 'main.dart'; // importujemy localeNotifier i themeNotifier
+import 'translations.dart'; // plik z tłumaczeniami S.
 
-class MainMenuScreen extends StatelessWidget {
+class MainMenuScreen extends StatefulWidget {
   const MainMenuScreen({super.key});
 
   @override
+  State<MainMenuScreen> createState() => _MainMenuScreenState();
+}
+
+class _MainMenuScreenState extends State<MainMenuScreen> {
+  @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
@@ -15,14 +24,14 @@ class MainMenuScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // NAGŁÓWEK
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.library_music_rounded, color: Color(0xFFFF0000), size: 36),
-                  SizedBox(width: 12),
+                  const Icon(Icons.library_music_rounded, color: Color(0xFFFF0000), size: 36),
+                  const SizedBox(width: 12),
                   Text(
                     'SZLAGIER',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: isDark ? Colors.white : Colors.black,
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.5,
@@ -32,8 +41,8 @@ class MainMenuScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Witaj amatorze muzyki wszelakiej!',
-                style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                S.isEn ? 'Welcome, music lover!' : 'Witaj amatorze muzyki wszelakiej!',
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
               ),
               const SizedBox(height: 60),
 
@@ -41,15 +50,18 @@ class MainMenuScreen extends StatelessWidget {
               _buildMenuButton(
                 context,
                 icon: Icons.qr_code_scanner_rounded,
-                title: 'Skanuj kod',
-                subtitle: 'Uruchom odtwarzacz muzyki z QR',
+                title: S.scanQr,
+                subtitle: S.isEn ? 'Launch the music player via QR' : 'Uruchom odtwarzacz muzyki z QR',
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => QrScannerScreen(),
+                      builder: (context) => const QrScannerScreen(),
                     ),
-                  );
+                  ).then((_) {
+                    // Odświeżenie stanu po powrocie ze skanera
+                    setState(() {});
+                  });
                 },
               ),
               const SizedBox(height: 20),
@@ -57,17 +69,10 @@ class MainMenuScreen extends StatelessWidget {
               _buildMenuButton(
                 context,
                 icon: Icons.settings_rounded,
-                title: 'Opcje',
-                subtitle: 'Konfiguracja i preferencje aplikacji',
+                title: S.settings,
+                subtitle: S.isEn ? 'App configuration and preferences' : 'Konfiguracja i preferencje aplikacji',
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Dostępne wkrótce...'),
-                      backgroundColor: Colors.grey[900],
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
+                  _showSettingsBottomSheet(context);
                 },
               ),
               const SizedBox(height: 20),
@@ -75,8 +80,8 @@ class MainMenuScreen extends StatelessWidget {
               _buildMenuButton(
                 context,
                 icon: Icons.person_rounded,
-                title: 'O autorze',
-                subtitle: 'Kim jestem i czym się zajmuję',
+                title: S.isEn ? 'About Author' : 'O autorze',
+                subtitle: S.isEn ? 'Who I am and what I do' : 'Kim jestem i czym się zajmuję',
                 onTap: () {
                   _showAboutMeDialog(context);
                 },
@@ -86,7 +91,7 @@ class MainMenuScreen extends StatelessWidget {
               Center(
                 child: Text(
                   'v1.0.0 Stable',
-                  style: TextStyle(color: Colors.grey.withOpacity(0.3), fontSize: 12),
+                  style: TextStyle(color: Colors.grey.withValues(alpha: 0.3), fontSize: 12),
                 ),
               ),
             ],
@@ -104,17 +109,21 @@ class MainMenuScreen extends StatelessWidget {
     required String subtitle,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: LinearGradient(
-          colors: [const Color(0xFF141414), const Color(0xFF1D1D1D)],
+          colors: isDark 
+              ? [const Color(0xFF141414), const Color(0xFF1D1D1D)]
+              : [const Color(0xFFF5F5F5), const Color(0xFFEFEFEF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
@@ -125,8 +134,8 @@ class MainMenuScreen extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(16),
-          splashColor: const Color(0xFFFF0000).withOpacity(0.1),
-          highlightColor: const Color(0xFFFF0000).withOpacity(0.05),
+          splashColor: const Color(0xFFFF0000).withValues(alpha: 0.1),
+          highlightColor: const Color(0xFFFF0000).withValues(alpha: 0.05),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
             child: Row(
@@ -134,8 +143,9 @@ class MainMenuScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0A0A0A),
+                    color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
                     borderRadius: BorderRadius.circular(12),
+                    border: isDark ? null : Border.all(color: Colors.grey[300]!),
                   ),
                   child: Icon(icon, color: const Color(0xFFFF0000), size: 28),
                 ),
@@ -146,17 +156,24 @@ class MainMenuScreen extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black, 
+                          fontSize: 18, 
+                          fontWeight: FontWeight.bold
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600], 
+                          fontSize: 13
+                        ),
                       ),
                     ],
                   ),
                 ),
-                Icon(Icons.arrow_forward_ios_rounded, color: Colors.grey[700], size: 16),
+                Icon(Icons.arrow_forward_ios_rounded, color: Colors.grey[600], size: 16),
               ],
             ),
           ),
@@ -165,45 +182,162 @@ class MainMenuScreen extends StatelessWidget {
     );
   }
 
-  // Okienko "O autorze" wyciągające informacje z Twojego profilu
+  // Panel dolny z ustawieniami Języka i Motywu
+  void _showSettingsBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+
+            return Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF141414) : Colors.white,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Górna kreseczka do zamykania
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[600],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    S.settings,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Divider(color: Colors.grey),
+                  const SizedBox(height: 10),
+
+                  // Opcja 1: Język
+                  ListTile(
+                    leading: const Icon(Icons.language_rounded, color: Color(0xFFFF0000)),
+                    title: Text(
+                      S.language, 
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black)
+                    ),
+                    trailing: DropdownButton<String>(
+                      value: localeNotifier.value.languageCode,
+                      underline: const SizedBox(),
+                      dropdownColor: isDark ? const Color(0xFF1D1D1D) : Colors.white,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                      items: [
+                        DropdownMenuItem(value: 'pl', child: Text(S.polish)),
+                        DropdownMenuItem(value: 'en', child: Text(S.english)),
+                      ],
+                      onChanged: (langCode) {
+                        if (langCode != null) {
+                          localeNotifier.value = Locale(langCode);
+                          // Odświeża modal oraz ekran pod spodem
+                          setModalState(() {});
+                          setState(() {}); 
+                        }
+                      },
+                    ),
+                  ),
+
+                  // Opcja 2: Motyw
+                  ListTile(
+                    leading: Icon(
+                      isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded, 
+                      color: const Color(0xFFFF0000)
+                    ),
+                    title: Text(
+                      S.theme, 
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black)
+                    ),
+                    trailing: Switch(
+                      value: isDark,
+                      activeThumbColor: const Color(0xFFFF0000),
+                      onChanged: (value) {
+                        themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
+                        // Odświeża modal oraz ekran pod spodem
+                        setModalState(() {});
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Okienko "O autorze" wspierające język angielski
   void _showAboutMeDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF141414),
+          backgroundColor: isDark ? const Color(0xFF141414) : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.code_rounded, color: Color(0xFFFF0000)),
-              SizedBox(width: 10),
-              Text('O Autorze', style: TextStyle(color: Colors.white)),
+              const Icon(Icons.code_rounded, color: Color(0xFFFF0000)),
+              const SizedBox(width: 10),
+              Text(
+                S.isEn ? 'About Author' : 'O Autorze', 
+                style: TextStyle(color: isDark ? Colors.white : Colors.black)
+              ),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Twórca aplikacji to inżynier automatyzacji testów (Test Automation Engineer), specjalizujący się w budowaniu zaawansowanych i stabilnych architektur testowych.',
-                style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+              Text(
+                S.isEn
+                    ? 'The app creator is a Test Automation Engineer specializing in building advanced and stable test architectures.'
+                    : 'Twórca aplikacji to inżynier automatyzacji testów (Test Automation Engineer), specjalizujący się w budowaniu zaawansowanych i stabilnych architektur testowych.',
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : Colors.black87, 
+                  fontSize: 14, 
+                  height: 1.4
+                ),
               ),
               const SizedBox(height: 16),
               Text(
-                'Główne technologie:',
-                style: TextStyle(color: Colors.grey[400], fontSize: 13, fontWeight: FontWeight.bold),
+                S.isEn ? 'Main technologies:' : 'Główne technologie:',
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : Colors.grey[700], 
+                  fontSize: 13, 
+                  fontWeight: FontWeight.bold
+                ),
               ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _buildTechChip('C#'),
-                  _buildTechChip('.NET'),
-                  _buildTechChip('TypeScript'),
-                  _buildTechChip('Playwright'),
-                  _buildTechChip('xUnit / SpecFlow'),
-                  _buildTechChip('Flutter'),
+                  _buildTechChip(context, 'C#'),
+                  _buildTechChip(context, '.NET'),
+                  _buildTechChip(context, 'TypeScript'),
+                  _buildTechChip(context, 'Playwright'),
+                  _buildTechChip(context, 'xUnit / SpecFlow'),
+                  _buildTechChip(context, 'Flutter'),
                 ],
               ),
             ],
@@ -211,7 +345,10 @@ class MainMenuScreen extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Zamknij', style: TextStyle(color: Color(0xFFFF0000))),
+              child: Text(
+                S.isEn ? 'Close' : 'Zamknij', 
+                style: const TextStyle(color: Color(0xFFFF0000))
+              ),
             ),
           ],
         );
@@ -219,17 +356,19 @@ class MainMenuScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTechChip(String label) {
+  Widget _buildTechChip(BuildContext context, String label) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF0A0A0A),
+        color: isDark ? const Color(0xFF0A0A0A) : Colors.grey[100],
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[900]!),
+        border: Border.all(color: isDark ? Colors.grey[900]! : Colors.grey[300]!),
       ),
       child: Text(
         label,
-        style: const TextStyle(color: Colors.grey, fontSize: 12),
+        style: TextStyle(color: isDark ? Colors.grey : Colors.grey[700], fontSize: 12),
       ),
     );
   }
