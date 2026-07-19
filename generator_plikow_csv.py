@@ -8,7 +8,23 @@ from tkinter import messagebox, filedialog, ttk
 import requests
 from bs4 import BeautifulSoup
 from lxml import html
+import requests
+from tkinter import scrolledtext
+import sys
 
+class TkinterConsoleRedirector:
+    def __init__(self, text_widget):
+        self.text_widget = text_widget
+
+    def write(self, string):
+        # Dopisywanie tekstu na koniec pola logów
+        self.text_widget.insert(tk.END, string)
+        # Automatyczne przewijanie na sam dół, aby widzieć najnowsze logi
+        self.text_widget.see(tk.END)
+
+    def flush(self):
+        # Wymagane przez architekturę sys.stdout
+        pass
 
 class YouTubeCSVGeneratorApp:
     def __init__(self, root):
@@ -33,8 +49,8 @@ class YouTubeCSVGeneratorApp:
         instruction_label.pack(pady=10)
 
         # Pole tekstowe na utwory
-        self.text_area = tk.Text(self.root, wrap=tk.WORD, height=12)
-        self.text_area.pack(padx=15, pady=5, fill=tk.BOTH, expand=True)
+        self.text_area = scrolledtext.ScrolledText(self.root, wrap=tk.WORD, width=50, height=10)
+        self.text_area.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         
         # Domyślny tekst pomocniczy
         self.text_area.insert(
@@ -44,6 +60,26 @@ class YouTubeCSVGeneratorApp:
         # Pasek postępu (Progressbar)
         self.progress = ttk.Progressbar(self.root, orient=tk.HORIZONTAL, mode='determinate')
         self.progress.pack(padx=15, pady=5, fill=tk.X)
+        
+        log_label = tk.Label(self.root, text="Logi systemowe (Konsola):", font=("Arial", 10, "bold"))
+        log_label.pack(padx=10, pady=(10, 0), anchor=tk.W)
+
+        # --- NOWE POLE TEKSTOWE NA LOGI ---
+        # Ustawiamy state=tk.NORMAL na starcie, żeby system mógł tam pisać. 
+        # Kolor tła zmieniamy na lekko szary/czarny dla efektu konsoli (opcjonalnie).
+        self.console_area = scrolledtext.ScrolledText(
+            self.root, 
+            wrap=tk.WORD, 
+            width=60, 
+            height=8, 
+            bg="#f0f0f0", 
+            fg="#333333"
+        )
+        self.console_area.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
+
+        # --- KLUCZOWY MOMENT: Przekierowanie sys.stdout ---
+        # Od tej linijki każdy print() wyląduje w self.console_area
+        sys.stdout = TkinterConsoleRedirector(self.console_area)
 
         # Status Label
         self.status_label = tk.Label(self.root, text="Gotowy do działania", fg="gray")
@@ -245,6 +281,62 @@ class YouTubeCSVGeneratorApp:
         except Exception as e:
             print(f"[CBPP BŁĄD] Wystąpił błąd: {e}")
             return None
+        
+    # Umieść tę metodę wewnątrz swojej klasy, obok Wikipedii i CBPP
+    def get_discogs_year(self, artist, title):
+        """
+        Wyszukuje rok wydania utworu w bazie Discogs API.
+        Wymaga wygenerowania darmowego tokena deweloperskiego na discogs.com.
+        """
+        # Ustaw tutaj swój token wygenerowany w panelu dewelopera Discogs
+        token = "hahlZFQfQiHsHFmwqtXzdefYzkIQjYLKUXAOtYlB" 
+
+        base_url = "https://api.discogs.com/database/search"
+        
+        params = {
+            "q": f"{artist} {title}",
+            "type": "release",
+            "token": token,
+            "per_page": 10 # Sprawdzamy top 10 wyników, żeby znaleźć najstarszy
+        }
+        
+        headers = {
+            "User-Agent": "YouTubeCSVGeneratorApp/1.0 (kontakt@twojadomena.pl)"
+        }
+        
+        try:
+            response = requests.get(base_url, params=params, headers=headers, timeout=6)
+            
+            if response.status_code == 200:
+                data = response.json()
+                results = data.get("results", [])
+                
+                found_years = []
+                
+                # Przeszukujemy wyniki i zbieramy wszystkie poprawne lata
+                for result in results:
+                    year = result.get("year")
+                    if year:
+                        year_str = str(year).strip()
+                        # Interesują nas tylko sensowne, 4-cyfrowe roczniki
+                        if year_str.isdigit() and len(year_str) == 4:
+                            year_int = int(year_str)
+                            # Zabezpieczenie przed błędami w bazie (np. rok 0 albo z przyszłości)
+                            if 1920 < year_int <= 2026: 
+                                found_years.append(year_int)
+                
+                if found_years:
+                    # Wybieramy najwcześniejszy rok (MINIMUM) - to da nam 1976 zamiast 2022
+                    original_year = min(found_years)
+                    print(f"[DISCOGS SUCCESS] Znaleziono najstarszy rok: {original_year} dla {artist} - {title}")
+                    return str(original_year)
+                            
+                print(f"[DISCOGS] Brak zdefiniowanego roku dla frazy: {artist} - {title}")
+                return None
+                
+        except Exception as e:
+            print(f"[DISCOGS BŁĄD EXCEPTION] {e}")
+            return None
 
     def get_youtube_url(self, artist, title, retries=3, delay=2):
         """
@@ -285,6 +377,12 @@ class YouTubeCSVGeneratorApp:
         return "Nie znaleziono"
 
     def process_songs(self):
+        # Czyszczenie okna konsoli przed nowym zadaniem
+        self.console_area.delete("1.0", tk.END)
+        
+        raw_text = self.text_area.get("1.0", tk.END).strip()
+        # ... reszta Twojego kodu process_songs ...
+        
         raw_text = self.text_area.get("1.0", tk.END).strip()
         if not raw_text:
             messagebox.showwarning("Brak danych", "Wpisz najpierw utwory do przetworzenia.")
@@ -315,7 +413,7 @@ class YouTubeCSVGeneratorApp:
             # --- KROK 1: Próba pobrania z Wikipedii ---
             year = self.get_wikipedia_year(artist, title)
             
-            if year:
+            if year and year != "Brak danych":
                 print(f"[WIKIPEDIA] Znaleziono rok wydania dla '{artist} - {title}': {year}")
             else:
                 # --- KROK 2: Jeśli Wikipedia zawiodła, szukamy w CBPP ---
@@ -327,10 +425,20 @@ class YouTubeCSVGeneratorApp:
                 if year and year != "Brak danych":
                     print(f"[CBPP] Znaleziono rok wydania dla '{artist} - {title}': {year}")
                 else:
-                    print(f"[BŁĄD/BRAK DANYCH] Nie udało się znaleźć roku wydania dla '{artist} - {title}' (zarówno na Wikipedii, jak i w CBPP).")
-                    year = "Brak danych"
+                    # --- KROK 3: Ostateczna broń - Google Playwright z AI ---
+                    print(f"[CBPP] Brak danych dla '{artist} - {title}'. Uruchamiam zaawansowane wyszukiwanie w Discogs...")
+                    self.status_label.config(text=f"Szukanie w Discogs ({index + 1}/{total_songs}): {artist} - {title}")
+                    
+                    year = self.get_discogs_year(artist, title)
+                    
+                    if year and year != "Brak danych":
+                        print(f"[DISCOGS] Znaleziono rok wydania dla '{artist} - {title}': {year}")
+                    else:
+                        print(f"[BŁĄD/BRAK DANYCH] Nie udało się znaleźć roku wydania dla '{artist} - {title}' (Wiki, CBPP oraz Discogs zawiodły).")
+                        year = "Brak danych"
             
-            # --- KROK 3: Pobieranie linku z YouTube ---
+            # --- KROK 4: Pobieranie linku z YouTube ---
+            self.status_label.config(text=f"Szukanie linku YT ({index + 1}/{total_songs}): {artist} - {title}")
             yt_url = self.get_youtube_url(artist, title)
 
             self.processed_results.append({
@@ -343,7 +451,7 @@ class YouTubeCSVGeneratorApp:
             self.progress["value"] = index + 1
             self.root.update_idletasks()
             
-            # Odpoczynek dla serwerów (1 sekunda), aby zapobiec timeoutom i blokadom IP
+            # Odpoczynek dla serwerów (1 sekunda)
             if index < total_songs - 1:
                 time.sleep(1)
 
