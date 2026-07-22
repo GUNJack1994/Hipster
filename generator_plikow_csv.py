@@ -4,203 +4,388 @@ import threading
 import time
 import urllib.parse
 import tkinter as tk
-from tkinter import messagebox, filedialog, ttk
+from tkinter import messagebox, filedialog, ttk, scrolledtext
 import requests
-from bs4 import BeautifulSoup
 from lxml import html
-import requests
-from tkinter import scrolledtext
-import sys
-
-class TkinterConsoleRedirector:
-    def __init__(self, text_widget):
-        self.text_widget = text_widget
-
-    def write(self, string):
-        # Dopisywanie tekstu na koniec pola logów
-        self.text_widget.insert(tk.END, string)
-        # Automatyczne przewijanie na sam dół, aby widzieć najnowsze logi
-        self.text_widget.see(tk.END)
-
-    def flush(self):
-        # Wymagane przez architekturę sys.stdout
-        pass
 
 class YouTubeCSVGeneratorApp:
     def __init__(self, root):
         self.root = root
         self.root.title("YouTube CSV Generator")
-        self.root.geometry("600x550")
-        self.root.minsize(550, 450)
+        self.root.geometry("800x730")
+        self.root.minsize(700, 600)
 
-        # Przechowywanie wyników w pamięci aplikacji
+        # Paleta kolorów DARK MODE
+        self.COLOR_BG = "#0F172A"             # Tło główne (ciemny granat/grafit)
+        self.COLOR_CARD = "#1E293B"           # Tło kart i pojemników
+        self.COLOR_CARD_SECONDARY = "#334155" # Tło podrzędne / obramowania
+        self.COLOR_TEXT = "#F8FAFC"            # Główny białawy tekst
+        self.COLOR_TEXT_MUTED = "#94A3B8"      # Jasnoszary tekst pomocniczy
+        self.COLOR_BORDER = "#334155"          # Kolor obramowań
+        
+        # Akcenty
+        self.COLOR_PRIMARY = "#3B82F6"         # Jasnoniebieski akcent
+        self.COLOR_PRIMARY_HOVER = "#2563EB"
+        self.COLOR_SUCCESS = "#10B981"         # Zielony dla pobierania
+        self.COLOR_SUCCESS_HOVER = "#059669"
+        self.COLOR_INPUT_BG = "#0F172A"        # Tło pól tekstowych
+
+        self.root.configure(bg=self.COLOR_BG)
+
+        # Konfiguracja styli ttk
+        self.setup_styles()
+
+        # Przechowywanie wyników
         self.processed_results = []
 
-        # UI Elements
+        # Tworzenie interfejsu
         self.create_widgets()
 
+    def setup_styles(self):
+        self.style = ttk.Style()
+        self.style.theme_use("clam")
+
+        # Styl tabeli dla Dark Mode
+        self.style.configure(
+            "Treeview",
+            background=self.COLOR_CARD,
+            foreground=self.COLOR_TEXT,
+            rowheight=28,
+            fieldbackground=self.COLOR_CARD,
+            font=("Segoe UI", 9),
+            borderwidth=0
+        )
+        self.style.configure(
+            "Treeview.Heading",
+            background=self.COLOR_CARD_SECONDARY,
+            foreground=self.COLOR_TEXT,
+            font=("Segoe UI", 9, "bold"),
+            borderwidth=1,
+            relief="flat"
+        )
+        # Podświetlenie wybranego wiersza
+        self.style.map("Treeview", background=[("selected", "#1E3A8A")], foreground=[("selected", "#FFFFFF")])
+
+        # Pasek postępu
+        self.style.configure(
+            "Custom.Horizontal.TProgressbar",
+            thickness=6,
+            troughcolor=self.COLOR_CARD_SECONDARY,
+            background=self.COLOR_PRIMARY,
+            borderwidth=0
+        )
+
     def create_widgets(self):
-        # Etykieta instruująca
-        instruction_label = tk.Label(
-            self.root, 
-            text="Wklej utwory w formacie: Wykonawca - Tytuł (jeden pod drugim)", 
-            font=("Arial", 10, "bold")
+        # --- NAGŁÓWEK ---
+        header_frame = tk.Frame(self.root, bg=self.COLOR_BG)
+        header_frame.pack(fill=tk.X, padx=20, pady=(15, 10))
+
+        title_label = tk.Label(
+            header_frame, 
+            text="YouTube CSV Generator", 
+            font=("Segoe UI", 16, "bold"), 
+            bg=self.COLOR_BG, 
+            fg=self.COLOR_TEXT
         )
-        instruction_label.pack(pady=10)
+        title_label.pack(anchor=tk.W)
 
-        # Pole tekstowe na utwory
-        self.text_area = scrolledtext.ScrolledText(self.root, wrap=tk.WORD, width=50, height=10)
-        self.text_area.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-        
-        # Domyślny tekst pomocniczy
-        self.text_area.insert(
-            tk.END, "Perfect - Nie płacz Ewka\nLady Pank - Mniej niż zero\nTSA - 51"
+        subtitle_label = tk.Label(
+            header_frame, 
+            text="Automatyczne pobieranie dat wydań oraz linków z YouTube z możliwością walidacji.", 
+            font=("Segoe UI", 9), 
+            bg=self.COLOR_BG, 
+            fg=self.COLOR_TEXT_MUTED
         )
+        subtitle_label.pack(anchor=tk.W)
 
-        # Pasek postępu (Progressbar)
-        self.progress = ttk.Progressbar(self.root, orient=tk.HORIZONTAL, mode='determinate')
-        self.progress.pack(padx=15, pady=5, fill=tk.X)
-        
-        log_label = tk.Label(self.root, text="Logi systemowe (Konsola):", font=("Arial", 10, "bold"))
-        log_label.pack(padx=10, pady=(10, 0), anchor=tk.W)
+        # --- KROK 1: WPROWADZANIE DANYCH ---
+        card_step1 = tk.Frame(self.root, bg=self.COLOR_CARD, bd=1, relief="solid", highlightbackground=self.COLOR_BORDER)
+        card_step1.pack(fill=tk.X, padx=20, pady=5)
 
-        # --- NOWE POLE TEKSTOWE NA LOGI ---
-        # Ustawiamy state=tk.NORMAL na starcie, żeby system mógł tam pisać. 
-        # Kolor tła zmieniamy na lekko szary/czarny dla efektu konsoli (opcjonalnie).
-        self.console_area = scrolledtext.ScrolledText(
-            self.root, 
+        step1_title = tk.Label(
+            card_step1, 
+            text="KROK 1: Wklej listę utworów (Wykonawca - Tytuł)", 
+            font=("Segoe UI", 10, "bold"), 
+            bg=self.COLOR_CARD, 
+            fg=self.COLOR_TEXT
+        )
+        step1_title.pack(anchor=tk.W, padx=15, pady=(10, 5))
+
+        self.text_area = scrolledtext.ScrolledText(
+            card_step1, 
             wrap=tk.WORD, 
-            width=60, 
-            height=8, 
-            bg="#f0f0f0", 
-            fg="#333333"
+            width=50, 
+            height=5, 
+            font=("Consolas", 9),
+            bg=self.COLOR_INPUT_BG,
+            fg=self.COLOR_TEXT,
+            insertbackground=self.COLOR_TEXT, # Kursor w ciemnym motywie
+            bd=1,
+            relief="solid",
+            highlightthickness=0
         )
-        self.console_area.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
-
-        # --- KLUCZOWY MOMENT: Przekierowanie sys.stdout ---
-        # Od tej linijki każdy print() wyląduje w self.console_area
-        sys.stdout = TkinterConsoleRedirector(self.console_area)
-
-        # Status Label
-        self.status_label = tk.Label(self.root, text="Gotowy do działania", fg="gray")
-        self.status_label.pack(pady=5)
-
-        # Kontener na przyciski na dole
-        btn_frame = tk.Frame(self.root)
-        btn_frame.pack(pady=15)
-
-        # Przycisk startu generowania
-        self.generate_btn = tk.Button(
-            btn_frame, 
-            text="Uruchom pobieranie", 
-            command=self.start_processing_thread, 
-            bg="#2980b9", 
-            fg="white", 
-            font=("Arial", 11, "bold"),
-            padx=15,
-            pady=5
-        )
-        self.generate_btn.pack(side=tk.LEFT, padx=10)
-
-        # Nowy przycisk pobierania pliku CSV (domyślnie wyłączony)
-        self.download_btn = tk.Button(
-            btn_frame, 
-            text="Pobierz plik CSV", 
-            command=self.save_csv_file, 
-            bg="#2ecc71", 
-            fg="white", 
-            font=("Arial", 11, "bold"),
-            padx=15,
-            pady=5,
-            state=tk.DISABLED  # Aktywuje się po skończeniu pracy
-        )
-        self.download_btn.pack(side=tk.LEFT, padx=10)
-
-    def start_processing_thread(self):
-        # Czyścimy stare wyniki przed nowym pobieraniem
-        self.processed_results = []
-        self.download_btn.config(state=tk.DISABLED)
+        self.text_area.pack(padx=15, pady=(0, 10), fill=tk.BOTH, expand=True)
         
-        # Uruchamiamy wątek roboczy
-        thread = threading.Thread(target=self.process_songs)
-        thread.daemon = True
-        thread.start()
+        # Domyślny tekst
+        default_songs = "Perfect - Nie płacz Ewka\nLady Pank - Mniej niż zero\nTSA - 51"
+        self.text_area.insert(tk.END, default_songs)
 
-    def get_wikipedia_year(self, artist, title):
-        """Wyszukuje rok wydania na Wikipedii."""
-        headers = {
-            "User-Agent": "YouTubeCSVGenerator/1.0 (kontakt: tester@example.com)"
+        # Przycisk startu
+        self.generate_btn = tk.Button(
+            card_step1, 
+            text="▶ Rozpocznij pobieranie", 
+            command=self.start_processing_thread, 
+            bg=self.COLOR_PRIMARY, 
+            fg="white", 
+            font=("Segoe UI", 9, "bold"),
+            bd=0,
+            padx=15,
+            pady=6,
+            cursor="hand2",
+            activebackground=self.COLOR_PRIMARY_HOVER,
+            activeforeground="white"
+        )
+        self.generate_btn.pack(anchor=tk.E, padx=15, pady=(0, 10))
+
+        # --- PASEK POSTĘPU I STATUS ---
+        status_frame = tk.Frame(self.root, bg=self.COLOR_BG)
+        status_frame.pack(fill=tk.X, padx=20, pady=5)
+
+        self.progress = ttk.Progressbar(status_frame, orient=tk.HORIZONTAL, mode='determinate', style="Custom.Horizontal.TProgressbar")
+        self.progress.pack(fill=tk.X, pady=(0, 2))
+
+        self.status_label = tk.Label(status_frame, text="Gotowy do pracy", font=("Segoe UI", 8), bg=self.COLOR_BG, fg=self.COLOR_TEXT_MUTED)
+        self.status_label.pack(anchor=tk.W)
+
+        # --- KROK 2: TABELA Z WALIDACJĄ ---
+        card_step2 = tk.Frame(self.root, bg=self.COLOR_CARD, bd=1, relief="solid", highlightbackground=self.COLOR_BORDER)
+        card_step2.pack(fill=tk.BOTH, expand=True, padx=20, pady=5)
+
+        step2_header = tk.Frame(card_step2, bg=self.COLOR_CARD)
+        step2_header.pack(fill=tk.X, padx=15, pady=10)
+
+        step2_title = tk.Label(
+            step2_header, 
+            text="KROK 2: Weryfikacja i edycja wyników", 
+            font=("Segoe UI", 10, "bold"), 
+            bg=self.COLOR_CARD, 
+            fg=self.COLOR_TEXT
+        )
+        step2_title.pack(side=tk.LEFT)
+
+        step2_hint = tk.Label(
+            step2_header, 
+            text="💡 Kliknij 2x na 'Rok', aby go zmienić ręcznie", 
+            font=("Segoe UI", 8, "italic"), 
+            bg=self.COLOR_CARD, 
+            fg=self.COLOR_PRIMARY
+        )
+        step2_hint.pack(side=tk.RIGHT)
+
+        # Container na tabelę
+        tree_container = tk.Frame(card_step2, bg=self.COLOR_CARD)
+        tree_container.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0, 5))
+
+        columns = ("artist", "title", "year", "url")
+        self.tree = ttk.Treeview(tree_container, columns=columns, show="headings", selectmode="browse")
+        
+        self.tree.heading("artist", text="Wykonawca")
+        self.tree.heading("title", text="Tytuł")
+        self.tree.heading("year", text="Rok wydania ✏️")
+        self.tree.heading("url", text="URL YouTube")
+
+        self.tree.column("artist", width=150)
+        self.tree.column("title", width=180)
+        self.tree.column("year", width=110, anchor=tk.CENTER)
+        self.tree.column("url", width=220)
+
+        scrollbar = ttk.Scrollbar(tree_container, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscroll=scrollbar.set)
+        
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.tree.bind("<Double-1>", self.on_double_click_year)
+
+        # Panel narzędzi ponownego wyszukiwania
+        retry_frame = tk.Frame(card_step2, bg=self.COLOR_CARD_SECONDARY, padx=10, pady=5)
+        retry_frame.pack(fill=tk.X, padx=15, pady=(0, 10))
+
+        tk.Label(retry_frame, text="Szukaj ponownie zaznaczonego w:", font=("Segoe UI", 8, "bold"), bg=self.COLOR_CARD_SECONDARY, fg=self.COLOR_TEXT).pack(side=tk.LEFT, padx=(0, 5))
+
+        btn_style = {
+            "font": ("Segoe UI", 8), 
+            "bg": self.COLOR_CARD, 
+            "fg": self.COLOR_TEXT, 
+            "bd": 1, 
+            "relief": "solid", 
+            "padx": 8, 
+            "cursor": "hand2",
+            "activebackground": self.COLOR_PRIMARY,
+            "activeforeground": "white"
         }
 
-        # --- KROK 1: Spróbujmy wejść bezpośrednio na stronę o tytule piosenki ---
-        # Automatycznie upewniamy się, że popularne frazy mają odpowiednie przecinki (np. "tam, gdzie")
-        formatted_title = title
-        if "tam gdzie" in formatted_title.lower():
-            formatted_title = formatted_title.replace("tam gdzie", "tam, gdzie")
-            
-        formatted_title = formatted_title.replace(" ", "_")
-        direct_url = f"https://pl.wikipedia.org/wiki/{urllib.parse.quote(formatted_title)}"
-        
-        try:
-            response = requests.get(direct_url, headers=headers, timeout=4)
-            if response.status_code == 200:
-                tree = html.fromstring(response.content)
-                year = self._extract_year_from_tree(tree)
-                if year:
-                    return year
-        except Exception as e:
-            print(f"[WIKIPEDIA DIRECT ERROR] {e}")
+        tk.Button(retry_frame, text="Wikipedia", command=lambda: self.recheck_source("wiki"), **btn_style).pack(side=tk.LEFT, padx=2)
+        tk.Button(retry_frame, text="CBPP", command=lambda: self.recheck_source("cbpp"), **btn_style).pack(side=tk.LEFT, padx=2)
+        tk.Button(retry_frame, text="Discogs", command=lambda: self.recheck_source("discogs"), **btn_style).pack(side=tk.LEFT, padx=2)
 
-        # --- KROK 2: Jeśli bezpośredni link nie istnieje, korzystamy z API wyszukiwarki ---
-        search_query = f"{artist} {title}"
-        url = f"https://pl.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(search_query)}&format=json"
+        # --- KROK 3: POBIERANIE ---
+        bottom_frame = tk.Frame(self.root, bg=self.COLOR_BG)
+        bottom_frame.pack(fill=tk.X, padx=20, pady=(5, 15))
+
+        self.download_btn = tk.Button(
+            bottom_frame, 
+            text="3. Pobierz gotowy plik CSV", 
+            command=self.save_csv_file, 
+            bg=self.COLOR_SUCCESS, 
+            fg="white", 
+            font=("Segoe UI", 10, "bold"),
+            bd=0,
+            padx=20,
+            pady=8,
+            cursor="hand2",
+            state=tk.DISABLED,
+            activebackground=self.COLOR_SUCCESS_HOVER,
+            activeforeground="white"
+        )
+        self.download_btn.pack(side=tk.RIGHT)
+
+    # --- ZDARZENIA I OBSŁUGI TABELI ---
+    def on_double_click_year(self, event):
+        item_id = self.tree.focus()
+        if not item_id:
+            return
+
+        column = self.tree.identify_column(event.x)
+        if column != "#3":
+            return
+
+        x, y, w, h = self.tree.bbox(item_id, column)
+        current_val = self.tree.item(item_id, "values")[2]
+
+        entry = tk.Entry(
+            self.tree, 
+            font=("Segoe UI", 9), 
+            bg=self.COLOR_INPUT_BG, 
+            fg=self.COLOR_TEXT, 
+            insertbackground=self.COLOR_TEXT,
+            bd=1, 
+            relief="solid"
+        )
+        entry.place(x=x, y=y, width=w, height=h)
+        entry.insert(0, current_val)
+        entry.focus()
+
+        def save_edit(event=None):
+            new_val = entry.get().strip()
+            values = list(self.tree.item(item_id, "values"))
+            values[2] = new_val if new_val else "Brak danych"
+            self.tree.item(item_id, values=values)
+            
+            idx = int(item_id)
+            self.processed_results[idx]["Rok"] = values[2]
+            entry.destroy()
+
+        entry.bind("<Return>", save_edit)
+        entry.bind("<FocusOut>", lambda e: entry.destroy())
+
+    def recheck_source(self, source_name):
+        selected_item = self.tree.focus()
+        if not selected_item:
+            messagebox.showwarning("Brak wyboru", "Zaznacz wpierw utwór na liście.")
+            return
+
+        idx = int(selected_item)
+        item_data = self.processed_results[idx]
+        artist = item_data["Wykonawca"]
+        title = item_data["Tytuł"]
+
+        def worker():
+            self.status_label.config(text=f"Wyszukiwanie w źródle: {source_name.upper()}...")
+            new_year = None
+
+            if source_name == "wiki":
+                new_year = self.get_wikipedia_year(artist, title)
+            elif source_name == "cbpp":
+                new_year = self.get_cbpp_year(artist, title)
+            elif source_name == "discogs":
+                new_year = self.get_discogs_year(artist, title)
+
+            if new_year and new_year != "Brak danych":
+                item_data["Rok"] = new_year
+                values = list(self.tree.item(selected_item, "values"))
+                values[2] = new_year
+                self.tree.item(selected_item, values=values)
+                messagebox.showinfo("Sukces", f"Zaktualizowano rok na: {new_year}")
+            else:
+                messagebox.showwarning("Brak wyników", f"Baza {source_name.upper()} nie posiada informacji o dacie.")
+            
+            self.status_label.config(text="Status: Oczekiwanie")
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    # --- LOGIKA POBIERANIA DANYCH ---
+    def get_wikipedia_year(self, artist, title):
+        headers = {"User-Agent": "YouTubeCSVGenerator/1.0"}
+        languages = ["pl", "en"]
         
-        try:
-            response = requests.get(url, headers=headers, timeout=4)
-            if response.status_code == 200:
-                data = response.json()
-                search_results = data.get("query", {}).get("search", [])
-                
-                if search_results:
-                    page_title = search_results[0]["title"]
-                    page_url = f"https://pl.wikipedia.org/wiki/{urllib.parse.quote(page_title)}"
-                    
-                    page_response = requests.get(page_url, headers=headers, timeout=4)
-                    tree = html.fromstring(page_response.content)
+        for lang in languages:
+            direct_url = f"https://{lang}.wikipedia.org/wiki/{urllib.parse.quote(title)}"
+            try:
+                response = requests.get(direct_url, headers=headers, timeout=4)
+                if response.status_code == 200:
+                    tree = html.fromstring(response.content)
                     year = self._extract_year_from_tree(tree)
                     if year:
                         return year
-        except Exception as e:
-            print(f"Błąd wyszukiwania API Wikipedia ({artist} - {title}): {e}")
+            except Exception:
+                pass
+
+            search_query = f"{artist} {title}"
+            api_url = f"https://{lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(search_query)}&format=json"
+            
+            try:
+                response = requests.get(api_url, headers=headers, timeout=4)
+                if response.status_code == 200:
+                    data = response.json()
+                    search_results = data.get("query", {}).get("search", [])
+                    if search_results:
+                        page_title = search_results[0]["title"]
+                        page_url = f"https://{lang}.wikipedia.org/wiki/{urllib.parse.quote(page_title)}"
+                        page_response = requests.get(page_url, headers=headers, timeout=4)
+                        tree = html.fromstring(page_response.content)
+                        year = self._extract_year_from_tree(tree)
+                        if year:
+                            return year
+            except Exception:
+                pass
             
         return None
 
     def _extract_year_from_tree(self, tree):
-        """Pomocnicza funkcja wyciągająca rok z drzewa HTML Wikipedii."""
-        # 1. Sprawdzamy tabelę (infobox) po prawej stronie
-        xpath_headers = ["Wydany", "Data wydania", "Data premiery", "Nagrany", "Rok"]
+        xpath_headers = [
+            "Wydany", "Data wydania", "Data premiery", "Nagrany", "Rok",
+            "Released", "Publication date", "Recorded", "Issue date"
+        ]
+        
         for header in xpath_headers:
-            # Twój oryginalny, precyzyjny XPath rozszerzony o brakujące nagłówki
-            xpath_expr = f"//th[contains(text(), '{header}')]/../td//text()"
+            xpath_expr = f"//th[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{header.lower()}')]/../td//text()"
             raw_texts = tree.xpath(xpath_expr)
             if raw_texts:
                 full_text = "".join(raw_texts).strip()
-                # Szukamy 4 cyfr z przedziału lat 1940-2029
                 match = re.search(r'\b(19[4-9]\d|20[0-2]\d)\b', full_text)
                 if match:
                     return match.group(1)
 
-        # 2. Sprawdzamy pierwszy akapit tekstu (częsty opis: "...wydany w 1971 roku...")
         paragraphs = tree.xpath("//div[@class='mw-parser-output']/p[position() <= 3]//text()")
         if paragraphs:
             full_intro = "".join(paragraphs)
-            match = re.search(r'(?:rok\w*|wydan\w*|nagran\w*)\s+.*?(\b\d{4}\b)|(\b\d{4}\b)\s+.*?(?:rok\w*|wydan\w*|nagran\w*)', full_intro, re.IGNORECASE)
+            match = re.search(r'(?:rok\w*|wydan\w*|nagran\w*|releas\w*|record\w*)\s+.*?(\b\d{4}\b)|(\b\d{4}\b)\s+.*?(?:rok\w*|wydan\w*|nagran\w*|releas\w*|record\w*)', full_intro, re.IGNORECASE)
             if match:
                 year = next((g for g in match.groups() if g), None)
                 if year:
                     return year
             
-            # Ostateczny test akapitu na obecność jakichkolwiek 4 cyfr
             simple_match = re.search(r'\b(19[4-9]\d|20[0-2]\d)\b', full_intro)
             if simple_match:
                 return simple_match.group(1)
@@ -208,184 +393,92 @@ class YouTubeCSVGeneratorApp:
         return None
 
     def get_cbpp_year(self, artist, title):
-        """
-        Wyszukuje rok powstania utworu w Cyfrowej Bibliotece Polskiej Piosenki (CBPP).
-        Buduje bezpośredni adres URL wyszukiwania: /szukaj/wyniki/Wykonawca Tytuł
-        """
         base_url = "https://bibliotekapiosenki.pl"
-        
-        # Formatowanie frazy: "Wykonawca Tytuł" (bez myślnika)
         search_phrase = f"{artist} {title}"
-        
-        # Budujemy pełny URL wyszukiwania z zakodowanymi znakami (np. spacje jako %20)
         search_url = f"{base_url}/szukaj/wyniki/{urllib.parse.quote(search_phrase)}"
         
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Referer": base_url
-        }
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         
         try:
-            # --- KROK 1: Pobranie wyników wyszukiwania ---
-            response = requests.get(search_url, headers=headers, timeout=8)
-            
+            response = requests.get(search_url, headers=headers, timeout=6)
             if response.status_code != 200:
-                print(f"[CBPP] Błąd połączenia z wyszukiwarką (Status: {response.status_code})")
                 return None
                 
             tree = html.fromstring(response.content)
-            
-            # Wyciągamy hiperłącze pasujące do klasy i struktury /utwory/
             song_links = tree.xpath("//a[contains(@class, 'articlelink') and contains(@href, '/utwory/')]/@href")
             
             if not song_links:
-                # Jeśli miks Wykonawca + Tytuł nic nie dał, spróbujmy wyszukać sam Tytuł
-                search_url_title_only = f"{base_url}/szukaj/wyniki/{urllib.parse.quote(title)}"
-                response = requests.get(search_url_title_only, headers=headers, timeout=8)
-                tree = html.fromstring(response.content)
-                song_links = tree.xpath("//a[contains(@class, 'articlelink') and contains(@href, '/utwory/')]/@href")
-                
-                if not song_links:
-                    print(f"[CBPP] Nie znaleziono utworów dla: {artist} {title}")
-                    return None
+                return None
             
-            # Pobieramy pierwszy znaleziony link do docelowej strony utworu
             song_page_url = f"{base_url}{song_links[0]}"
-            print(f"[CBPP] Przechodzę do strony utworu: {song_page_url}")
-            
-            # --- KROK 2: Pobranie docelowej strony utworu ---
-            song_response = requests.get(song_page_url, headers=headers, timeout=8)
+            song_response = requests.get(song_page_url, headers=headers, timeout=6)
             if song_response.status_code != 200:
                 return None
                 
             song_tree = html.fromstring(song_response.content)
-            
-            # --- KROK 3: Wyciągnięcie roku na podstawie tekstu 'Data powstania:' ---
             xpath_year = "//td[contains(., 'Data powstania:')]/following-sibling::td//text()"
             raw_year_data = song_tree.xpath(xpath_year)
             
             if raw_year_data:
-                # Łączymy napisy i czyścimy ze zbędnych spacji/nowych linii
                 full_text = "".join(raw_year_data).strip()
-                
-                # Szukamy 4-cyfrowego roku
                 match = re.search(r'\b(19[4-9]\d|20[0-2]\d)\b', full_text)
                 if match:
-                    detected_year = match.group(1)
-                    print(f"[CBPP SUCCESS] Wykryto rok: {detected_year}")
-                    return detected_year
-            
-            print(f"[CBPP] Nie znaleziono roku w sekcji 'Data powstania:'")
+                    return match.group(1)
             return None
-            
-        except Exception as e:
-            print(f"[CBPP BŁĄD] Wystąpił błąd: {e}")
+        except Exception:
             return None
-        
-    # Umieść tę metodę wewnątrz swojej klasy, obok Wikipedii i CBPP
-    def get_discogs_year(self, artist, title):
-        """
-        Wyszukuje rok wydania utworu w bazie Discogs API.
-        Wymaga wygenerowania darmowego tokena deweloperskiego na discogs.com.
-        """
-        # Ustaw tutaj swój token wygenerowany w panelu dewelopera Discogs
-        token = "hahlZFQfQiHsHFmwqtXzdefYzkIQjYLKUXAOtYlB" 
 
+    def get_discogs_year(self, artist, title):
+        token = "hahlZFQfQiHsHFmwqtXzdefYzkIQjYLKUXAOtYlB" 
         base_url = "https://api.discogs.com/database/search"
-        
-        params = {
-            "q": f"{artist} {title}",
-            "type": "release",
-            "token": token,
-            "per_page": 10 # Sprawdzamy top 10 wyników, żeby znaleźć najstarszy
-        }
-        
-        headers = {
-            "User-Agent": "YouTubeCSVGeneratorApp/1.0 (kontakt@twojadomena.pl)"
-        }
+        params = {"q": f"{artist} {title}", "type": "release", "token": token, "per_page": 10}
+        headers = {"User-Agent": "YouTubeCSVGeneratorApp/1.0"}
         
         try:
             response = requests.get(base_url, params=params, headers=headers, timeout=6)
-            
             if response.status_code == 200:
-                data = response.json()
-                results = data.get("results", [])
-                
+                results = response.json().get("results", [])
                 found_years = []
-                
-                # Przeszukujemy wyniki i zbieramy wszystkie poprawne lata
                 for result in results:
                     year = result.get("year")
-                    if year:
-                        year_str = str(year).strip()
-                        # Interesują nas tylko sensowne, 4-cyfrowe roczniki
-                        if year_str.isdigit() and len(year_str) == 4:
-                            year_int = int(year_str)
-                            # Zabezpieczenie przed błędami w bazie (np. rok 0 albo z przyszłości)
-                            if 1920 < year_int <= 2026: 
-                                found_years.append(year_int)
-                
+                    if year and str(year).isdigit() and 1920 < int(year) <= 2026:
+                        found_years.append(int(year))
                 if found_years:
-                    # Wybieramy najwcześniejszy rok (MINIMUM) - to da nam 1976 zamiast 2022
-                    original_year = min(found_years)
-                    print(f"[DISCOGS SUCCESS] Znaleziono najstarszy rok: {original_year} dla {artist} - {title}")
-                    return str(original_year)
-                            
-                print(f"[DISCOGS] Brak zdefiniowanego roku dla frazy: {artist} - {title}")
-                return None
-                
-        except Exception as e:
-            print(f"[DISCOGS BŁĄD EXCEPTION] {e}")
+                    return str(min(found_years))
+            return None
+        except Exception:
             return None
 
-    def get_youtube_url(self, artist, title, retries=3, delay=2):
-        """
-        Wyszukuje link do filmu na YouTube. 
-        W przypadku błędu połączenia lub timeoutu, ponawia próbę do 'retries' razy.
-        """
+    def get_youtube_url(self, artist, title):
         query = f"{artist} {title}"
         url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
-        }
-        
-        for attempt in range(retries):
-            try:
-                # Dodaliśmy timeout=5 na żądanie – jeśli YouTube nie odpowie w 5s, rzuci błąd i spróbuje ponownie
-                response = requests.get(url, headers=headers, timeout=5)
-                
-                if response.status_code == 200:
-                    video_ids = re.findall(r'"videoId":"([^"]+)"', response.text)
-                    if video_ids:
-                        for video_id in video_ids:
-                            return f"https://www.youtube.com/watch?v={video_id}"
-                
-                # Jeśli kod odpowiedzi to np. 429 Too Many Requests, odczekaj chwilę przed ponowieniem
-                if response.status_code == 429:
-                    print(f"YouTube zwrócił błąd 429 (Too Many Requests) dla {artist} - {title}. Próba {attempt + 1}/{retries}...")
-                    time.sleep(delay * 2)
-                    continue
-
-            except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
-                print(f"Timeout lub błąd sieci dla {artist} - {title} (Próba {attempt + 1}/{retries}): {e}")
-                if attempt < retries - 1:
-                    time.sleep(delay)  # Odczekaj chwilę przed kolejną próbą
-                else:
-                    return "Błąd (Timeout)"
-                    
+        try:
+            response = requests.get(url, headers=headers, timeout=5)
+            if response.status_code == 200:
+                video_ids = re.findall(r'"videoId":"([^"]+)"', response.text)
+                if video_ids:
+                    return f"https://www.youtube.com/watch?v={video_ids[0]}"
+        except Exception:
+            pass
         return "Nie znaleziono"
 
+    def start_processing_thread(self):
+        self.processed_results = []
+        for i in self.tree.get_children():
+            self.tree.delete(i)
+
+        self.download_btn.config(state=tk.DISABLED)
+        
+        thread = threading.Thread(target=self.process_songs)
+        thread.daemon = True
+        thread.start()
+
     def process_songs(self):
-        # Czyszczenie okna konsoli przed nowym zadaniem
-        self.console_area.delete("1.0", tk.END)
-        
-        raw_text = self.text_area.get("1.0", tk.END).strip()
-        # ... reszta Twojego kodu process_songs ...
-        
         raw_text = self.text_area.get("1.0", tk.END).strip()
         if not raw_text:
-            messagebox.showwarning("Brak danych", "Wpisz najpierw utwory do przetworzenia.")
+            messagebox.showwarning("Brak danych", "Wpisz utwory do przetworzenia.")
             return
 
         lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
@@ -398,79 +491,56 @@ class YouTubeCSVGeneratorApp:
         for index, line in enumerate(lines):
             if " - " in line:
                 parts = line.split(" - ", 1)
-                artist = parts[0].strip()
-                title = parts[1].strip()
+                artist, title = parts[0].strip(), parts[1].strip()
             elif "-" in line:
                 parts = line.split("-", 1)
-                artist = parts[0].strip()
-                title = parts[1].strip()
+                artist, title = parts[0].strip(), parts[1].strip()
             else:
-                artist = "Nieznany"
-                title = line.strip()
+                artist, title = "Nieznany", line.strip()
 
             self.status_label.config(text=f"Przetwarzanie ({index + 1}/{total_songs}): {artist} - {title}")
             
-            # --- KROK 1: Próba pobrania z Wikipedii ---
+            # Kaskadowe sprawdzanie
             year = self.get_wikipedia_year(artist, title)
-            
-            if year and year != "Brak danych":
-                print(f"[WIKIPEDIA] Znaleziono rok wydania dla '{artist} - {title}': {year}")
-            else:
-                # --- KROK 2: Jeśli Wikipedia zawiodła, szukamy w CBPP ---
-                print(f"[WIKIPEDIA] Brak danych dla '{artist} - {title}'. Uruchamiam wyszukiwanie w CBPP...")
-                self.status_label.config(text=f"Szukanie w CBPP ({index + 1}/{total_songs}): {artist} - {title}")
-                
+            if not year:
                 year = self.get_cbpp_year(artist, title)
-                
-                if year and year != "Brak danych":
-                    print(f"[CBPP] Znaleziono rok wydania dla '{artist} - {title}': {year}")
-                else:
-                    # --- KROK 3: Ostateczna broń - Google Playwright z AI ---
-                    print(f"[CBPP] Brak danych dla '{artist} - {title}'. Uruchamiam zaawansowane wyszukiwanie w Discogs...")
-                    self.status_label.config(text=f"Szukanie w Discogs ({index + 1}/{total_songs}): {artist} - {title}")
-                    
-                    year = self.get_discogs_year(artist, title)
-                    
-                    if year and year != "Brak danych":
-                        print(f"[DISCOGS] Znaleziono rok wydania dla '{artist} - {title}': {year}")
-                    else:
-                        print(f"[BŁĄD/BRAK DANYCH] Nie udało się znaleźć roku wydania dla '{artist} - {title}' (Wiki, CBPP oraz Discogs zawiodły).")
-                        year = "Brak danych"
-            
-            # --- KROK 4: Pobieranie linku z YouTube ---
-            self.status_label.config(text=f"Szukanie linku YT ({index + 1}/{total_songs}): {artist} - {title}")
+            if not year:
+                year = self.get_discogs_year(artist, title)
+            if not year:
+                year = "Brak danych"
+
             yt_url = self.get_youtube_url(artist, title)
 
-            self.processed_results.append({
+            song_data = {
                 "Wykonawca": artist,
                 "Rok": year,
                 "Tytuł": title,
                 "url": yt_url
-            })
+            }
+            
+            self.processed_results.append(song_data)
+            self.tree.insert("", tk.END, iid=str(index), values=(artist, title, year, yt_url))
 
             self.progress["value"] = index + 1
             self.root.update_idletasks()
             
-            # Odpoczynek dla serwerów (1 sekunda)
             if index < total_songs - 1:
-                time.sleep(1)
+                time.sleep(0.5)
 
-        self.status_label.config(text="Zakończono pobieranie! Możesz teraz pobrać plik.")
+        self.status_label.config(text="Status: Proces zakończony. Sprawdź lub wyedytuj dane poniżej.")
         self.generate_btn.config(state=tk.NORMAL)
         
-        # Aktywacja przycisku zapisu CSV po udanym zakończeniu
         if self.processed_results:
             self.download_btn.config(state=tk.NORMAL)
 
     def save_csv_file(self):
-        """Uruchamia systemowe okienko zapisu i eksportuje zebrane dane do formatu CSV."""
         if not self.processed_results:
             return
 
         file_path = filedialog.asksaveasfilename(
             defaultextension=".csv",
             filetypes=[("Pliki CSV", "*.csv"), ("Wszystkie pliki", "*.*")],
-            title="Zapisz listę utworów jako"
+            title="Zapisz listę jako CSV"
         )
         
         if file_path:
@@ -483,10 +553,9 @@ class YouTubeCSVGeneratorApp:
                     for row in self.processed_results:
                         writer.writerow(row)
                 
-                messagebox.showinfo("Sukces", f"Zapisano pomyślnie {len(self.processed_results)} utworów!")
+                messagebox.showinfo("Sukces", f"Pomyślnie wygenerowano plik ze {len(self.processed_results)} pozycjami!")
             except Exception as e:
-                messagebox.showerror("Błąd zapisu", f"Nie udało się zapisać pliku:\n{e}")
-
+                messagebox.showerror("Błąd", f"Nie udało się zapisać pliku:\n{e}")
 
 if __name__ == "__main__":
     root = tk.Tk()
